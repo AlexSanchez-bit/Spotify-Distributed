@@ -20,7 +20,8 @@ class RoutingTable:
         """
 
         bucket_index = self.get_bucket_index(node.id)
-        self.buckets[bucket_index].add_node(node)
+        if bucket_index >= 0:
+            self.buckets[bucket_index].add_node(node)
 
     def replace(self, id, o):
         print(f"replacing {id} with {0}")

@@ -28,11 +28,10 @@ class KademliaNetwork:
         self.sended_pings = []
         print(f"node {node.id} listenning on {node.ip}:{node.port}")
 
-    def send_rpc(self, node: Node, rpc: Rpc):
+    def send_rpc(self, node: Node, rpc):
         """
         Send An Encoded rpc to the peer
         """
-        self.refresh_k_buckets(node)
         message = pickle.dumps(rpc)
         self.server_socket.sendto(message, (node.ip, node.port))
 
@@ -46,14 +45,10 @@ class KademliaNetwork:
             sender = Node(ip, port)
             self.refresh_k_buckets(sender)
             rpc = pickle.loads(message)
-            if (
-                rpc[0] == RpcType.Ping
-                and rpc[1] == MessageType.Response
-                and sender in self.sended_pings
-            ):
-                # if the node on a k-bucket has responded delete it from the sended pings
-                self.sended_pings.remove(sender)
-            self.node.handle_rpc(sender, rpc)
+            respond_thread = threading.Thread(
+                target=self.node.handle_rpc, args=[sender, rpc]
+            )
+            respond_thread.start()
 
     def refresh_k_buckets(self, node: Node):
         least = self.node.routing_table.add_node(node)

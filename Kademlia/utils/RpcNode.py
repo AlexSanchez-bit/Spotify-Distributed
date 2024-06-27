@@ -1,8 +1,11 @@
 from KBucket import Node
-from utils.Rpc import Rpc
 
 
-class RpcNode:
+class RpcNode(Node):
+    def __init__(self, ip, port, routing_table):
+        super().__init__(ip, port)
+        self.routing_table = routing_table
+
     def ping(self, node: Node):
         pass
 
@@ -15,5 +18,5 @@ class RpcNode:
     def find_value(self, key: str):
         pass
 
-    def handle_rpc(self, address, rpc: Rpc):
+    def handle_rpc(self, address, rpc):
         pass

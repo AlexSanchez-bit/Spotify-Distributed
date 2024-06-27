@@ -24,6 +24,9 @@ class Node:
     def __eq__(self, o):
         return self.id == o.id
 
+    def __ne__(self, o):
+        return self.id != o.id
+
 
 class KBucket:
     def __init__(self, range_start: int, range_end: int):
@@ -37,11 +40,9 @@ class KBucket:
             if index != len(self.nodes) - 1:
                 self.nodes = self.nodes[0:index] + self.nodes[index + 1:]
             return None
-
-        if node not in self.nodes:
+        elif len(self.nodes) <= K:
             self.nodes.append(node)
-
-        if len(self.nodes) >= K:
+        else:
             node = self.nodes.pop(0)
             return node
 

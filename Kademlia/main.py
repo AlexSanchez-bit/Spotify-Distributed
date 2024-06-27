@@ -13,7 +13,7 @@ def main():
         ip = sys.argv[1]
         port = int(sys.argv[2])
         node.ping(Node(ip, port))
-        print("heyyy")
+        node.find_node_on_network("playlist-12232323")
 
 
 main()
