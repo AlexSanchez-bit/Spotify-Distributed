@@ -22,6 +22,12 @@ class RoutingTable:
         bucket_index = self.get_bucket_index(node.id)
         self.buckets[bucket_index].add_node(node)
 
+    def replace(self, id, o):
+        print(f"replacing {id} with {0}")
+        idx = self.get_bucket_index(id)
+        self.buckets[idx].remove_node(Node("", 0, id))
+        self.buckets[idx].add_node(o)
+
     def get_bucket_index(self, node_id: int) -> int:
         """
         Using XOR metric to calculate distances we get the nearest k-bucket for a given key
@@ -34,7 +40,6 @@ class RoutingTable:
         """
         Using BinarySearch we look for the nearest node on aur k-buckets
         """
-
         bucket_index = self.get_bucket_index(target_id)
         closest_nodes = self.buckets[bucket_index].get_nodes()
         for i in range(1, ID_LENGTH):
