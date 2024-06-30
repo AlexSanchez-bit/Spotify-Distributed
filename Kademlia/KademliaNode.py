@@ -26,9 +26,10 @@ class KademliaNode(KademliaRpcNode):
         closest_nodes = []
 
         while shortlist:
+            print("short list", shortlist)
             # Sort shortlist by distance to target_id
             shortlist.sort(key=lambda node: node.id ^ target_id)
-            closest_nodes = shortlist[:K]
+            closest_nodes = list(set(shortlist[:K]))
 
             # Parallel RPCs to alpha nodes
             threads = []
@@ -44,6 +45,7 @@ class KademliaNode(KademliaRpcNode):
             # Wait for all threads to complete
             for thread in threads:
                 thread.join()
+            print("contenido de la shortlist: ", shortlist)
 
             # Check if the closest nodes list has stabilized
             if all(node.id in already_queried for node in closest_nodes):
@@ -55,6 +57,7 @@ class KademliaNode(KademliaRpcNode):
     def _query_node(self, node: Node, target_id: int, shortlist: List[Node]):
         self.find_node(target_id, node)
         response = self._wait_for_response(target_id)
+        print("wait for response dio: ", response)
         if response:
             new_nodes = response
             with lock:
@@ -66,6 +69,7 @@ class KademliaNode(KademliaRpcNode):
         start_time = time.time()
         while time.time() - start_time < timeout:
             with lock:
+                print("lo nodos pedios", self.requested_nodes)
                 if target_id in self.requested_nodes:
                     response = self.requested_nodes[target_id]
                     del self.requested_nodes[target_id]
@@ -74,70 +78,32 @@ class KademliaNode(KademliaRpcNode):
         print("timeout passed")
         return []
 
-    def find_node_on_network(self, search_key, on_founded=None):
-        find_node_subroutine = threading.Thread(
-            target=self._find_node_on_network, args=[search_key, on_founded]
-        )
-        find_node_subroutine.start()
-        print("starting a find_node subroutine")
-
-    def _find_node_on_network(self, search_key, on_founded=None):
-        network_key = sha1_hash(search_key)
-        nodes = self.routing_table.find_closest_nodes(network_key, K)
-        nodes.sort(key=lambda node: node.id ^ network_key)
-        closest_knowed = Node(self.ip, self.port, self.id)
-
-        self.requested_nodes[network_key] = [closest_knowed] + nodes
-
-        for node in nodes:
-            if node.id != self.id:
-                self.find_node(network_key, node)
-        # if passed 3 secs a node doesnt respond its better to leave it
-        break_ = True
-        visited = []
-
-        while break_:
-            print("arrived", self.requested_nodes[network_key])
-
-            self.requested_nodes[network_key].sort(
-                key=lambda node: node.id ^ network_key
-            )
-
-            next_closest = self.requested_nodes[network_key][0]
-
-            print("actual min", closest_knowed, closest_knowed.id ^ network_key)
-            print("next min", next_closest, next_closest.id ^ network_key)
-
-            break_ = (closest_knowed.id ^ network_key) < (next_closest.id ^ network_key)
-
-            if not break_:
-                closest_knowed = self.requested_nodes[network_key][:K]
-                break
-            for i in [x for x in self.requested_nodes[network_key] if x not in visited][
-                :alpha
-            ]:
-                self.find_node(network_key, i)
-                visited.append(i)
-
-        self.requested_nodes.pop(network_key)
-        print("resultado final: ", closest_knowed)
-        if on_founded is not None:
-            on_founded(closest_knowed)
-        return closest_knowed
-
     def store_a_file(self, file_direction: str):
         key = sha1_hash(file_direction)
-        self.find_node_on_network(
-            file_direction, lambda nodes: self.send_store(nodes, key, file_direction)
-        )
+        nodes = self.node_lookup(key)
+        resp = self.send_store(nodes, key, file_direction)
+        print(resp)
 
     def send_store(self, nodes, key, file_direction):
+        threads = []
         for node in nodes:
-            self.store(key, node, (StoreAction.INSERT, DataType.File, file_direction))
+            print(f"sending a store to {node} on {key}")
+            threads.append(
+                threading.Thread(
+                    target=self.store,
+                    args=[
+                        key,
+                        node,
+                        (StoreAction.INSERT, DataType.File, file_direction),
+                    ],
+                )
+            )
+        for th in threads:
+            th.join()
+        print("Archivo enviado")
 
     def refresh_buckets(self):
         while True:
-            print("revising buckets")
             for bucket in self.routing_table.buckets:
                 for node in bucket.get_nodes():
                     self.ping(node)

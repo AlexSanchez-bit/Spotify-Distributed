@@ -12,6 +12,7 @@ from KademliaNetwork import KademliaNetwork
 import threading
 
 from utils.StoreAction import StoreAction
+import time
 
 lock = threading.Lock()
 
@@ -48,9 +49,9 @@ class KademliaRpcNode(RpcNode):
                 node, Rpc(RpcType.Store, MessageType.Request, (key, value))
             )
         else:
-            self.file_transfers[key] = FileTransfer(self.ip, file_direction=data)
-            my_direction = self.file_transfers[key].direction()
-            print("mai direcsion: ", my_direction)
+            transfer = FileTransfer(self.ip, file_direction=data)
+            my_direction = transfer.direction()
+            self.file_transfers[f"{key}{my_direction[1]}"] = transfer
             self.network.send_rpc(
                 node,
                 Rpc(
@@ -59,6 +60,13 @@ class KademliaRpcNode(RpcNode):
                     (key, (action, type, my_direction)),
                 ),
             )
+
+            while f"{key}{my_direction[1]}" in self.file_transfers:
+                if self.file_transfers[f"{key}{my_direction[1]}"] == "Error":
+                    del self.file_transfers[f"{key}{my_direction[1]}"]
+                    return "Error"
+                time.sleep(0.5)
+            return "OK"
 
     def store_response(self, key, node, value):
         self.network.send_rpc(
@@ -127,14 +135,10 @@ class KademliaRpcNode(RpcNode):
             result = self.routing_table.find_closest_nodes(target_id, K)
             print("results: ", result)
             result.sort(key=lambda node: node.id ^ target_id)
-            if result is None or result[0].id ^ target_id >= self.id ^ target_id:
-                print("im the closest i know")
-                result = [Node(self.ip, self.port, self.id)]
             self.find_node_response(target_id, result, node)
             print("responding to a find node", node, "with", result)
         if message_type == MessageType.Response:
             node, target_id, result = payload
-            print(result, "for", target_id)
             for res_node in result:
                 with lock:
                     print(self.requested_nodes)
@@ -155,9 +159,27 @@ class KademliaRpcNode(RpcNode):
             if data_type is DataType.File:
                 print("------------------", data)
                 ip, port = data
-                file_transfers = FileTransfer(ip, f"{key}.mp3", port=port)
-                file_transfers.receive_file("./songs/{key}.mp3")
+                file_transfers = FileTransfer(ip)
+                self.network.send_rpc(
+                    node,
+                    Rpc(
+                        RpcType.Store,
+                        MessageType.Response,
+                        (key, (action, type, (port, file_transfers.port))),
+                    ),
+                )
+                file_transfers.receive_file(f"{key}.mp3")
                 file_transfers.close_transmission()
         if type is MessageType.Response:
-            self.file_transfers[key].start_trasmission((node.ip, node.port))
             print(node, " respondio con ", data, " al store ", key)
+            request_port, peer_port = data
+            identifier = f"{key}{request_port}"
+            try:
+                self.file_transfers[identifier].start_trasmission((node.ip, peer_port))
+
+                self.file_transfers[identifier].close_transmission()
+
+                del self.file_transfers[identifier]
+            except Exception:
+                del self.file_transfers[identifier]
+                self.file_transfers[identifier] = "Error"

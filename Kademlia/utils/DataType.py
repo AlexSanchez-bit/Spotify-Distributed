@@ -2,5 +2,5 @@ from enum import Enum
 
 
 class DataType(Enum):
-    File = "FileFinalChunk"
+    File = "File"
     Data = "Data"

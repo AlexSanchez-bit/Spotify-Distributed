@@ -14,10 +14,11 @@ def main():
         ip = sys.argv[1]
         port = int(sys.argv[2])
         node.ping(Node(ip, port))
-        time.sleep(3)
-
-        target_id = sha1_hash("playlist-12232323")
-        node.node_lookup(target_id)
+    while True:
+        file_direction = input("file direction: ")
+        key = sha1_hash(file_direction)
+        node.node_lookup(key)
+        time.sleep(1)
 
 
 main()

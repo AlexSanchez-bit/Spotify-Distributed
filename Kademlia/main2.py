@@ -2,6 +2,7 @@ import sys
 from KademliaNode import KademliaNode
 from KBucket import Node, sha1_hash
 import os
+import time
 
 
 def main():
@@ -13,6 +14,11 @@ def main():
         ip = sys.argv[1]
         port = int(sys.argv[2])
         node.ping(Node(ip, port))
+    while True:
+        file_direction = input("file direction: ")
+        key = sha1_hash(file_direction)
+        node.node_lookup(key)
+        time.sleep(1)
 
 
 main()
