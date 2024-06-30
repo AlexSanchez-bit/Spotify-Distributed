@@ -1,4 +1,6 @@
 from KBucket import Node
+from utils.MessageType import MessageType
+from utils.StoreAction import StoreAction
 
 
 class RpcNode(Node):
@@ -6,10 +8,10 @@ class RpcNode(Node):
         super().__init__(ip, port)
         self.routing_table = routing_table
 
-    def ping(self, node: Node):
+    def ping(self, node: Node, type: MessageType):
         pass
 
-    def store(self, key: str, value: str):
+    def store(self, key, node, value):
         pass
 
     def find_node(self, target_id: int, node=None):

@@ -1,4 +1,5 @@
 import sys
+import time
 from KademliaNode import KademliaNode
 from KBucket import Node, sha1_hash
 import os
@@ -13,6 +14,7 @@ def main():
         ip = sys.argv[1]
         port = int(sys.argv[2])
         node.ping(Node(ip, port))
+        time.sleep(3)
         node.find_node_on_network("playlist-12232323")
 
 

@@ -8,6 +8,9 @@ import time
 
 import threading
 
+from utils.DataType import DataType
+from utils.StoreAction import StoreAction
+
 alpha = 3
 
 
@@ -16,25 +19,70 @@ class KademliaNode(KademliaRpcNode):
         super().__init__(ip, port)
         self.data_store = defaultdict(str)
 
-    def find_node_on_network(self, search_key):
+    def find_node_on_network(self, search_key, on_founded=None):
+        find_node_subroutine = threading.Thread(
+            target=self._find_node_on_network, args=[search_key, on_founded]
+        )
+        find_node_subroutine.start()
+        print("starting a find_node subroutine")
+
+    def _find_node_on_network(self, search_key, on_founded=None):
         network_key = sha1_hash(search_key)
         nodes = self.routing_table.find_closest_nodes(network_key, K)
         nodes.sort(key=lambda node: node.id ^ network_key)
-        closest_knowed = nodes[0]
-        self.requested_nodes[network_key] = []
+        closest_knowed = Node(self.ip, self.port, self.id)
+        self.requested_nodes[network_key] = [closest_knowed] + nodes
         for node in nodes:
-            self.find_node(network_key, node)
-        # if passed 10 secs a node doesnt respond its better to leave it
-        time.sleep(10)
-        print(closest_knowed)
-        print("arrived", self.requested_nodes[network_key])
+            if node.id != self.id:
+                self.find_node(network_key, node)
+        # if passed 3 secs a node doesnt respond its better to leave it
+        break_ = True
+        visited = []
+        while break_:
+            print("arrived", self.requested_nodes[network_key])
+
+            self.requested_nodes[network_key].sort(
+                key=lambda node: node.id ^ network_key
+            )
+
+            next_closest = self.requested_nodes[network_key][0]
+
+            print("actual min", closest_knowed, closest_knowed.id ^ network_key)
+            print("next min", next_closest, next_closest.id ^ network_key)
+
+            break_ = (closest_knowed.id ^ network_key) < (next_closest.id ^ network_key)
+
+            if not break_:
+                closest_knowed = self.requested_nodes[network_key][:K]
+                break
+            for i in [x for x in self.requested_nodes[network_key] if x not in visited][
+                :alpha
+            ]:
+                self.find_node(network_key, i)
+                visited.append(i)
+
+        self.requested_nodes.pop(network_key)
+        print("resultado final: ", closest_knowed)
+        if on_founded is not None:
+            on_founded(closest_knowed)
+        return closest_knowed
+
+    def store_a_file(self, file_direction: str):
+        key = sha1_hash(file_direction)
+        self.find_node_on_network(
+            file_direction, lambda nodes: self.send_store(nodes, key, file_direction)
+        )
+
+    def send_store(self, nodes, key, file_direction):
+        for node in nodes:
+            self.store(key, node, (StoreAction.INSERT, DataType.File, file_direction))
 
     def refresh_buckets(self):
         while True:
             print("revising buckets")
             for bucket in self.routing_table.buckets:
                 for node in bucket.get_nodes():
-                    print("buckets", node)
+                    self.ping(node)
             time.sleep(600)
 
     def start(self):
