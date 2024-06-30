@@ -11,6 +11,8 @@ from utils.Rpc import Rpc
 from utils.RpcNode import RpcNode
 from utils.RpcType import RpcType
 
+lock = threading.Lock()
+
 
 class KademliaNetwork:
     """
@@ -33,7 +35,8 @@ class KademliaNetwork:
         Send An Encoded rpc to the peer
         """
         message = pickle.dumps(rpc)
-        self.server_socket.sendto(message, (node.ip, node.port))
+        with lock:
+            self.server_socket.sendto(message, (node.ip, node.port))
 
     def receive_rpc(self):
         """
@@ -53,20 +56,26 @@ class KademliaNetwork:
     def refresh_k_buckets(self, node: Node):
         least = self.node.routing_table.add_node(node)
         if least is not None:
-            self.node.ping(least)
-            self.sended_pings.append(least)
-            receiver_thread = threading.Thread(
-                target=self.wait_to_response, args=[node, least]
-            )
-            receiver_thread.start()
+            self.node.ping(least, MessageType.Request)
+            with lock:
+                self.sended_pings.append(least)
+                receiver_thread = threading.Thread(
+                    target=self.wait_to_response, args=[node, least]
+                )
+                receiver_thread.start()
 
     def wait_to_response(self, least, current):
-        time.sleep(10)  # wait at least 10 secs
         print("dio ping uno viejo")
-        if least in self.sended_pings:  # if least has responded we would have delete it
+        count = 0
+        while least not in self.sended_pings:
+            time.sleep((3))
+            count += 1
+            if count >= 4:
+                return
+            # if least has responded we would have delete it
             # if still is on the list doesnt responde the ping
-            self.node.routing_table.replace(current.id, least.id)
-            self.sended_pings.remove(least)
+        self.node.routing_table.replace(current.id, least.id)
+        self.sended_pings.remove(least)
 
     def start(self):
         print("starting network")

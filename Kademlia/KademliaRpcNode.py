@@ -137,7 +137,11 @@ class KademliaRpcNode(RpcNode):
             print(result, "for", target_id)
             for res_node in result:
                 with lock:
-                    self.requested_nodes[target_id].append(res_node)
+                    print(self.requested_nodes)
+                    if target_id in self.requested_nodes:
+                        self.requested_nodes[target_id].append(res_node)
+                    else:
+                        self.requested_nodes[target_id] = [res_node]
 
     def handle_store(
         self,

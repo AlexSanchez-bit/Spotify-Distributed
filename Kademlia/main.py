@@ -15,7 +15,9 @@ def main():
         port = int(sys.argv[2])
         node.ping(Node(ip, port))
         time.sleep(3)
-        node.find_node_on_network("playlist-12232323")
+
+        target_id = sha1_hash("playlist-12232323")
+        node.node_lookup(target_id)
 
 
 main()
