@@ -46,6 +46,12 @@ class PlaylistManager:
         saved = self.load_from_json("../data/store.json")
         self.playlists = saved.playlists if saved is not None else []
 
+    def get_all(self):
+        return self.playlists
+
+    def bet_by_id(self, id):
+        return next((item for item in self.playlists if item.id == id), None)
+
     def make_action(self, action: StoreAction, playlist_data: Playlist):
         if action == StoreAction.INSERT:
             self.add_playlist(playlist_data)

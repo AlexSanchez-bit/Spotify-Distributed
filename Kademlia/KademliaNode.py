@@ -114,21 +114,25 @@ class KademliaNode(KademliaRpcNode):
 
     def send_store_file(self, nodes, key, file_direction):
         threads = []
-        for node in nodes:
-            print(f"sending a store to {node} on {key}")
-            thread = threading.Thread(
-                target=self.store,
-                args=[
-                    key,
-                    node,
-                    (StoreAction.INSERT, DataType.File, file_direction),
-                ],
-            )
-            threads.append(thread)
-            thread.start()
+        while len(nodes) > 0:
+            for node in nodes[alpha:]:
+                print(f"sending a store to {node} on {key}")
+                thread = threading.Thread(
+                    target=self.store,
+                    args=[
+                        key,
+                        node,
+                        (StoreAction.INSERT, DataType.File, file_direction),
+                    ],
+                )
+                threads.append(thread)
+                thread.start()
+            for th in threads:
+                th.join()
+                nodes.pop()
 
-        for th in threads:
-            th.join()
+    def get_data(self, data_id: str):
+        print("manana lo termino")
 
     def refresh_buckets(self):
         while True:

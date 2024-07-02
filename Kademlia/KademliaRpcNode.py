@@ -30,6 +30,7 @@ class KademliaRpcNode(RpcNode):
         self.database = PlaylistManager()
         self.requested_nodes = {}
         self.file_transfers = {}
+        self.values_requests = {}
         self.pings = {}
 
     def ping(self, node: Node, type: MessageType = MessageType.Request):
@@ -134,10 +135,31 @@ class KademliaRpcNode(RpcNode):
             ),
         )
 
-    def find_value(self, key: str) -> str:
-        return ""
+    def find_value(self, key: int, data_type: DataType, node: Node):
+        try:
+            self.network.send_rpc(
+                node, Rpc(RpcType.FindValue, MessageType.Request, (key, data_type))
+            )
+            identifier = f"{key}{node.id}"
+            self.values_requests[f"{key}{node.id}"] = None
+            start_time = time.time()
+            while time.time() - start_time < timeout:
+                time.sleep(0.5)
+                if self.values_requests[f"{key}{node.id}"] is not None:
+                    ret_val = self.values_requests[identifier]
+                    del self.values_requests[f"{key}{node.id}"]
+                    if data_type is DataType.Data:
+                        return ret_val
+                    else:
+                        print(f"se obtuvo la respuesta {ret_val}")
+                        return None
+            print(f"Timeout Exceeded: on key {key} for {node}")
+            return None
+        except Exception as e:
+            print(f"error buscando la llave {key} - > {e}")
+            return None
 
-    def handle_rpc(self, address, rpc: Rpc):
+    def handle_rpc(self, address, rpc):
         rpc_type, message_type, payload = rpc
         if rpc_type == RpcType.Ping:
             self.handle_ping(address, message_type)
@@ -146,6 +168,9 @@ class KademliaRpcNode(RpcNode):
         if rpc_type == RpcType.Store:
             key, value = payload
             self.handle_store(key, address, value, message_type)
+        if rpc_type == RpcType.FindValue:
+            key, data_type = payload
+            self.handle_find_value(key, address, data_type, message_type)
 
     def handle_ping(self, node, message_type):
         if message_type == MessageType.Request:
@@ -245,3 +270,6 @@ class KademliaRpcNode(RpcNode):
                     self.file_transfers[f"{key}{node.id}"] = False
                 else:
                     print(f"Error on action over playlist {key}{node.id}")
+
+    def handle_find_value(self, key, address, data_type, message_type):
+        print("llego un find_value wajajajaj")

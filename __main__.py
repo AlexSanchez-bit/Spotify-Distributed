@@ -40,6 +40,7 @@ def main():
         StoreAction.DELETE,
         Playlist("", "", id),
     )
+
     while True:
         file_direction = input("ip: ")
         node.store_a_file(file_direction)

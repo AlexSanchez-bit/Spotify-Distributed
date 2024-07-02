@@ -17,7 +17,7 @@ class RpcNode(Node):
     def find_node(self, target_id: int, node=None):
         pass
 
-    def find_value(self, key: str):
+    def find_value(self, key: int, node: Node):
         pass
 
     def handle_rpc(self, address, rpc):
