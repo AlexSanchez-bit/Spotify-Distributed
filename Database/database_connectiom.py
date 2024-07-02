@@ -1,35 +1,94 @@
-import sqlite3
+import json
+
+from Kademlia.utils.StoreAction import StoreAction
 
 
-def conect_database():
-    # Conectar a la base de datos
-    conn = sqlite3.connect("spotify.db")
-    cursor = conn.cursor()
+class Song:
+    def __init__(self, name, author):
+        self.name = name
+        self.author = author
+        self.key = self.generate_key()
 
-    # Crear la tabla playlists
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS playlists (
-        id INTEGER PRIMARY KEY,
-        nombre TEXT NOT NULL,
-        autor TEXT NOT NULL,
-        imagen TEXT
-    )
-    """)
+    def to_dict(self):
+        return {"name": self.name, "author": self.author, "key": self.key}
 
-    # Crear la tabla songs con una clave foránea que referencia a playlists
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS songs (
-        song_url TEXT NOT NULL,
-        playlist INTEGER NOT NULL,
-        FOREIGN KEY (playlist) REFERENCES playlists(id)
-    )
-    """)
-
-    # Guardar (commit) los cambios
-    conn.commit()
-    return conn
+    @classmethod
+    def from_dict(cls, data):
+        song = cls(data["name"], data["author"])
+        song.key = data["key"]
+        return song
 
 
-def close_conection_with_database(conn):
-    # Cerrar la conexión
-    conn.close()
+class Playlist:
+    def __init__(self, title, author, id):
+        self.title = title
+        self.author = author
+        self.songs = []
+        self.id = id
+
+    def to_dict(self):
+        return {
+            "title": self.title,
+            "author": self.author,
+            "songs": [song.to_dict() for song in self.songs],
+            "id": self.id,
+        }
+
+    @classmethod
+    def from_dict(cls, data):
+        playlist = cls(data["title"], data["author"], data["id"])
+        playlist.songs = [Song.from_dict(song_data) for song_data in data["songs"]]
+        return playlist
+
+
+class PlaylistManager:
+    def __init__(self):
+        saved = self.load_from_json("../data/store.json")
+        self.playlists = saved.playlists if saved is not None else []
+
+    def make_action(self, action: StoreAction, playlist_data: Playlist):
+        if action == StoreAction.INSERT:
+            self.add_playlist(playlist_data)
+        elif action == StoreAction.UPDATE:
+            self.playlists = [
+                playlist_data if item.id == playlist_data.id else item
+                for item in self.playlists
+            ]
+        elif action == StoreAction.DELETE:
+            self.playlists = [
+                item for item in self.playlists if item.id != playlist_data.id
+            ]
+        self.save_snapshop()
+
+    def add_playlist(self, playlist: Playlist):
+        self.playlists.append(playlist)
+
+    def save_snapshop(self):
+        self.save_to_json("data/store.json")
+
+    def to_dict(self):
+        return [playlist.to_dict() for playlist in self.playlists]
+
+    @classmethod
+    def from_dict(cls, data):
+        manager = cls()
+        manager.playlists = [
+            Playlist.from_dict(playlist_data) for playlist_data in data
+        ]
+        return manager
+
+    # Métodos para guardar y cargar en JSON
+    def save_to_json(self, filename):
+        with open(filename, "w") as f:
+            json.dump(self.to_dict(), f, indent=2)
+
+    @classmethod
+    def load_from_json(cls, filename):
+        try:
+            with open(filename, "r") as f:
+                data = json.load(f)
+            return cls.from_dict(data)
+        except Exception:
+            return None
+
+    # ... (resto de los métodos de la clase PlaylistManager)

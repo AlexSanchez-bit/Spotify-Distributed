@@ -1,22 +1,24 @@
-from os import lockf
-from KBucket import K, Node
+from Database.database_connectiom import PlaylistManager
+from Kademlia.KBucket import K, Node
 from typing import Tuple, Any, List
-from RoutingTable import RoutingTable
-from utils.DataTransfer.FileTransfer import FileTransfer
-from utils.DataType import DataType
-from utils.Rpc import Rpc
-from utils.RpcNode import RpcNode
-from utils.RpcType import RpcType
-from utils.MessageType import MessageType
-from KademliaNetwork import KademliaNetwork
+from Kademlia.RoutingTable import RoutingTable
+from Kademlia.utils.DataTransfer.FileTransfer import FileTransfer
+from Kademlia.utils.DataType import DataType
+from Kademlia.utils.Rpc import Rpc
+from Kademlia.utils.RpcNode import RpcNode
+from Kademlia.utils.RpcType import RpcType
+from Kademlia.utils.MessageType import MessageType
+from Kademlia.KademliaNetwork import KademliaNetwork
 import threading
 
-from utils.StoreAction import StoreAction
+from Kademlia.utils.StoreAction import StoreAction
 import time
 
 lock = threading.Lock()
 
 alfa = 3  # the number of paralel calls on node search rpcs
+
+timeout = 4
 
 
 class KademliaRpcNode(RpcNode):
@@ -25,13 +27,24 @@ class KademliaRpcNode(RpcNode):
         self.routing_table = RoutingTable(self.id)
         self.network = KademliaNetwork(self)
         self.routing_table.add_node(Node(ip, port))
+        self.database = PlaylistManager()
         self.requested_nodes = {}
         self.file_transfers = {}
+        self.pings = {}
 
     def ping(self, node: Node, type: MessageType = MessageType.Request):
+        print("making ping to", node)
         try:
-            print("making ping to", node)
             self.network.send_rpc(node, Rpc(RpcType.Ping, type, "Ping"))
+            with lock:
+                self.pings[node.id] = 1
+            waiting = True
+            start_time = time.time()
+            while waiting:
+                waiting = node.id in self.pings
+                if time.time() - start_time > timeout:
+                    return False
+                time.sleep(0.5)
             return True
         except Exception:
             return False
@@ -48,6 +61,14 @@ class KademliaRpcNode(RpcNode):
             self.network.send_rpc(
                 node, Rpc(RpcType.Store, MessageType.Request, (key, value))
             )
+            self.file_transfers[f"{key}{node.id}"] = True
+            start_time = time.time()
+            while time.time() - start_time < timeout:
+                time.sleep(0.5)
+                if not self.file_transfers[f"{key}{node.id}"]:
+                    return True
+            return False
+
         else:
             transfer = FileTransfer(self.ip, file_direction=data)
             my_direction = transfer.direction()
@@ -61,8 +82,14 @@ class KademliaRpcNode(RpcNode):
                 ),
             )
 
+            start_time = time.time()
             while f"{key}{my_direction[1]}" in self.file_transfers:
+                if time.time() - start_time > timeout:
+                    transfer.close_transmission()
+                    del self.file_transfers[f"{key}{my_direction[1]}"]
+                    return "TIMEOUT"
                 if self.file_transfers[f"{key}{my_direction[1]}"] == "Error":
+                    transfer.close_transmission()
                     del self.file_transfers[f"{key}{my_direction[1]}"]
                     return "Error"
                 time.sleep(0.5)
@@ -123,11 +150,17 @@ class KademliaRpcNode(RpcNode):
     def handle_ping(self, node, message_type):
         if message_type == MessageType.Request:
             print("requested ping from", node)
-            self.ping(node, type=MessageType.Response)
+            thread = threading.Thread(
+                target=self.ping, args=[node, MessageType.Response]
+            )
+            thread.start()
         if message_type == MessageType.Response:
             print("received ping from", node)
-            if node in self.network.sended_pings:
-                self.network.sended_pings.remove(node)
+            with lock:
+                del self.pings[node.id]
+            with lock:
+                if node in self.network.sended_pings:
+                    self.network.sended_pings.remove(node)
 
     def handle_find_node(self, message_type, node, payload):
         if message_type == MessageType.Request:
@@ -159,7 +192,7 @@ class KademliaRpcNode(RpcNode):
             if data_type is DataType.File:
                 print("------------------", data)
                 ip, port = data
-                file_transfers = FileTransfer(ip)
+                file_transfers = FileTransfer(self.ip)
                 self.network.send_rpc(
                     node,
                     Rpc(
@@ -168,18 +201,47 @@ class KademliaRpcNode(RpcNode):
                         (key, (action, type, (port, file_transfers.port))),
                     ),
                 )
-                file_transfers.receive_file(f"{key}.mp3")
+                file_transfers.receive_file(f"./songs/{key}.mp3")
                 file_transfers.close_transmission()
+            else:
+                print("recibido : ", data, " para: ", action)
+                try:
+                    with lock:
+                        self.database.make_action(action, data)
+                        self.network.send_rpc(
+                            node,
+                            Rpc(
+                                RpcType.Store,
+                                MessageType.Response,
+                                (key, (action, type, "OK")),
+                            ),
+                        )
+                except Exception as e:
+                    print(f"ocurrio un error al guardar la playlist {data.id}")
+                    self.network.send_rpc(
+                        node,
+                        Rpc(
+                            RpcType.Store,
+                            MessageType.Response,
+                            (key, (action, type, f"{e} on {data.name}")),
+                        ),
+                    )
         if type is MessageType.Response:
             print(node, " respondio con ", data, " al store ", key)
-            request_port, peer_port = data
-            identifier = f"{key}{request_port}"
-            try:
-                self.file_transfers[identifier].start_trasmission((node.ip, peer_port))
-
-                self.file_transfers[identifier].close_transmission()
-
-                del self.file_transfers[identifier]
-            except Exception:
-                del self.file_transfers[identifier]
-                self.file_transfers[identifier] = "Error"
+            if data_type is DataType.File:
+                request_port, peer_port = data
+                identifier = f"{key}{request_port}"
+                try:
+                    self.file_transfers[identifier].start_trasmission(
+                        (node.ip, peer_port)
+                    )
+                    self.file_transfers[identifier].close_transmission()
+                    del self.file_transfers[identifier]
+                except Exception:
+                    del self.file_transfers[identifier]
+                    self.file_transfers[identifier] = "Error"
+            else:
+                if data == "OK":
+                    self.file_transfers[f"{key}{node.id}"] = False
+                else:
+                    print(f"Error on action over playlist {key}{node.id}")

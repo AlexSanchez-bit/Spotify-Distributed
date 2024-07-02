@@ -1,6 +1,6 @@
-from KBucket import Node
-from utils.MessageType import MessageType
-from utils.StoreAction import StoreAction
+from Kademlia.KBucket import Node
+from Kademlia.utils.MessageType import MessageType
+from Kademlia.utils.StoreAction import StoreAction
 
 
 class RpcNode(Node):
@@ -8,7 +8,7 @@ class RpcNode(Node):
         super().__init__(ip, port)
         self.routing_table = routing_table
 
-    def ping(self, node: Node, type: MessageType):
+    def ping(self, node: Node, type: MessageType = MessageType.Request):
         pass
 
     def store(self, key, node, value):

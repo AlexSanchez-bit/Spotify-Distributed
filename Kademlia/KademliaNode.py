@@ -1,15 +1,16 @@
 from collections import defaultdict
 from typing import Any, List, Optional, Tuple
-from KBucket import Node, K, sha1_hash
-from KademliaRpcNode import KademliaRpcNode
+from Database.database_connectiom import Playlist
+from Kademlia.KBucket import Node, K, sha1_hash
+from Kademlia.KademliaRpcNode import KademliaRpcNode
 import threading
 import time
 from queue import PriorityQueue
 
 import threading
 
-from utils.DataType import DataType
-from utils.StoreAction import StoreAction
+from Kademlia.utils.DataType import DataType
+from Kademlia.utils.StoreAction import StoreAction
 
 lock = threading.Lock()
 alpha = 3
@@ -78,36 +79,63 @@ class KademliaNode(KademliaRpcNode):
         print("timeout passed")
         return []
 
-    def store_a_file(self, file_direction: str):
-        key = sha1_hash(file_direction)
+    def store_playlist(self, action: StoreAction, playlistData: Playlist):
+        key = sha1_hash(playlistData.id)
         nodes = self.node_lookup(key)
-        resp = self.send_store(nodes, key, file_direction)
+        resp = self.send_store_playlist(nodes, key, action, playlistData)
         print(resp)
 
-    def send_store(self, nodes, key, file_direction):
+    def send_store_playlist(
+        self, nodes, key, action: StoreAction, playlistData: Playlist
+    ):
         threads = []
         for node in nodes:
             print(f"sending a store to {node} on {key}")
-            threads.append(
-                threading.Thread(
-                    target=self.store,
-                    args=[
-                        key,
-                        node,
-                        (StoreAction.INSERT, DataType.File, file_direction),
-                    ],
-                )
+            thread = threading.Thread(
+                target=self.store,
+                args=[
+                    key,
+                    node,
+                    (action, DataType.Data, playlistData),
+                ],
             )
+            threads.append(thread)
+            thread.start()
+
         for th in threads:
             th.join()
         print("Archivo enviado")
+
+    def store_a_file(self, file_direction: str):
+        key = sha1_hash(file_direction)
+        nodes = self.node_lookup(key)
+        resp = self.send_store_file(nodes, key, file_direction)
+        print(resp)
+
+    def send_store_file(self, nodes, key, file_direction):
+        threads = []
+        for node in nodes:
+            print(f"sending a store to {node} on {key}")
+            thread = threading.Thread(
+                target=self.store,
+                args=[
+                    key,
+                    node,
+                    (StoreAction.INSERT, DataType.File, file_direction),
+                ],
+            )
+            threads.append(thread)
+            thread.start()
+
+        for th in threads:
+            th.join()
 
     def refresh_buckets(self):
         while True:
             for bucket in self.routing_table.buckets:
                 for node in bucket.get_nodes():
                     self.ping(node)
-            time.sleep(600)
+            time.sleep(700)
 
     def start(self):
         self.network.start()

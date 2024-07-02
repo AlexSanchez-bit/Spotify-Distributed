@@ -50,6 +50,7 @@ class KBucket:
             return node
 
     def remove_node(self, node: Node):
+        print("removing node: ", node, " from k-bucket")
         if node in self.nodes:
             self.nodes.remove(node)
 

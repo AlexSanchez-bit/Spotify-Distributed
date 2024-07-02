@@ -1,5 +1,5 @@
 from typing import List
-from KBucket import KBucket, Node, ID_LENGTH
+from Kademlia.KBucket import KBucket, Node, ID_LENGTH
 
 
 class RoutingTable:
@@ -39,7 +39,7 @@ class RoutingTable:
 
     def find_closest_nodes(self, target_id: int, count: int) -> List[Node]:
         """
-        Using BinarySearch we look for the nearest node on aur k-buckets
+        Using BinarySearch we look for the nearest node on our k-buckets
         """
         bucket_index = self.get_bucket_index(target_id)
         closest_nodes = self.buckets[bucket_index].get_nodes()
@@ -47,11 +47,8 @@ class RoutingTable:
             if len(closest_nodes) >= count:
                 break
             if bucket_index - i >= 0:
-                closest_nodes.extend(
-                    self.buckets[bucket_index - i].get_nodes())
+                closest_nodes.extend(self.buckets[bucket_index - i].get_nodes())
             if bucket_index + i < ID_LENGTH:
-                closest_nodes.extend(
-                    self.buckets[bucket_index + i].get_nodes())
-        closest_nodes = sorted(
-            closest_nodes, key=lambda node: node.id ^ target_id)
+                closest_nodes.extend(self.buckets[bucket_index + i].get_nodes())
+        closest_nodes = sorted(closest_nodes, key=lambda node: node.id ^ target_id)
         return closest_nodes[:count]

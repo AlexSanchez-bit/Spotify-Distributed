@@ -1,5 +1,5 @@
-from utils.RpcType import RpcType
-from utils.MessageType import MessageType
+from Kademlia.utils.RpcType import RpcType
+from Kademlia.utils.MessageType import MessageType
 
 
 def Rpc(rpctype: RpcType, messageType: MessageType, payload):

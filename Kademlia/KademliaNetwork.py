@@ -2,14 +2,14 @@ import socket
 import pickle
 from time import sleep
 import time
-from KBucket import Node
+from Kademlia.KBucket import Node
 from typing import Any, Tuple
 import threading
-from RoutingTable import RoutingTable
-from utils.MessageType import MessageType
-from utils.Rpc import Rpc
-from utils.RpcNode import RpcNode
-from utils.RpcType import RpcType
+from Kademlia.RoutingTable import RoutingTable
+from Kademlia.utils.MessageType import MessageType
+from Kademlia.utils.Rpc import Rpc
+from Kademlia.utils.RpcNode import RpcNode
+from Kademlia.utils.RpcType import RpcType
 
 lock = threading.Lock()
 
@@ -46,12 +46,12 @@ class KademliaNetwork:
             message, address = self.server_socket.recvfrom(4096)
             ip, port = address
             sender = Node(ip, port)
-            self.refresh_k_buckets(sender)
             rpc = pickle.loads(message)
             respond_thread = threading.Thread(
                 target=self.node.handle_rpc, args=[sender, rpc]
             )
             respond_thread.start()
+            self.refresh_k_buckets(sender)
 
     def refresh_k_buckets(self, node: Node):
         least = self.node.routing_table.add_node(node)
@@ -67,15 +67,15 @@ class KademliaNetwork:
     def wait_to_response(self, least, current):
         print("dio ping uno viejo")
         count = 0
+        start_time = time.time()
         while least not in self.sended_pings:
             time.sleep((3))
             count += 1
-            if count >= 4:
+            if time.time() - start_time > 4:
                 return
-            # if least has responded we would have delete it
-            # if still is on the list doesnt responde the ping
-        self.node.routing_table.replace(current.id, least.id)
-        self.sended_pings.remove(least)
+        with lock:
+            self.node.routing_table.replace(current.id, least.id)
+            self.sended_pings.remove(least)
 
     def start(self):
         print("starting network")
