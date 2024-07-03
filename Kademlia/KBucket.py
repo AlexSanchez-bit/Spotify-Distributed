@@ -46,8 +46,7 @@ class KBucket:
         elif len(self.nodes) <= K:
             self.nodes.append(node)
         else:
-            node = self.nodes.pop(0)
-            return node
+            return self.nodes[0]
 
     def remove_node(self, node: Node):
         print("removing node: ", node, " from k-bucket")

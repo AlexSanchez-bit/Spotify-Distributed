@@ -51,31 +51,21 @@ class KademliaNetwork:
                 target=self.node.handle_rpc, args=[sender, rpc]
             )
             respond_thread.start()
+
             self.refresh_k_buckets(sender)
+            refresh_thread = threading.Thread(
+                target=self.refresh_k_buckets, args=[sender]
+            )
+            refresh_thread.start()
 
     def refresh_k_buckets(self, node: Node):
         least = self.node.routing_table.add_node(node)
         if least is not None:
-            self.node.ping(least, MessageType.Request)
-            with lock:
-                self.sended_pings.append(least)
-                receiver_thread = threading.Thread(
-                    target=self.wait_to_response, args=[node, least]
-                )
-                receiver_thread.start()
-
-    def wait_to_response(self, least, current):
-        print("dio ping uno viejo")
-        count = 0
-        start_time = time.time()
-        while least not in self.sended_pings:
-            time.sleep((3))
-            count += 1
-            if time.time() - start_time > 4:
-                return
-        with lock:
-            self.node.routing_table.replace(current.id, least.id)
-            self.sended_pings.remove(least)
+            result = self.node.ping(least, MessageType.Request)
+            if not result:
+                index = self.node.routing_table.get_bucket_index(least)
+                self.node.routing_table.buckets[index].remove_node(least)
+                self.node.routing_table.add_node(node)
 
     def start(self):
         print("starting network")

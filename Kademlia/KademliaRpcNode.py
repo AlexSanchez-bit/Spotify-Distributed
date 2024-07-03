@@ -272,4 +272,4 @@ class KademliaRpcNode(RpcNode):
                     print(f"Error on action over playlist {key}{node.id}")
 
     def handle_find_value(self, key, address, data_type, message_type):
-        print("llego un find_value wajajajaj")
+        print("llego un find_value wajajajaj", key, address, data_type, message_type)
