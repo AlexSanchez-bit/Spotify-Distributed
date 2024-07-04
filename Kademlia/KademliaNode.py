@@ -19,7 +19,9 @@ alpha = 3
 class KademliaNode(KademliaRpcNode):
     def __init__(self, ip: str, port: int):
         super().__init__(ip, port)
-        self.data_store = defaultdict(str)
+        self.searched_data = {}
+
+    # Find Nodes on the network
 
     def node_lookup(self, target_id: int) -> List[Node]:
         shortlist = self.routing_table.find_closest_nodes(target_id, K)
@@ -38,7 +40,8 @@ class KademliaNode(KademliaRpcNode):
                 if node.id not in already_queried:
                     already_queried.add(node.id)
                     thread = threading.Thread(
-                        target=self._query_node, args=(node, target_id, shortlist)
+                        target=self._query_node, args=(
+                            node, target_id, shortlist)
                     )
                     threads.append(thread)
                     thread.start()
@@ -79,6 +82,8 @@ class KademliaNode(KademliaRpcNode):
         print("timeout passed")
         return []
 
+    # manage data storage
+
     def store_playlist(self, action: StoreAction, playlistData: Playlist):
         key = sha1_hash(playlistData.id)
         nodes = self.node_lookup(key)
@@ -104,7 +109,6 @@ class KademliaNode(KademliaRpcNode):
 
         for th in threads:
             th.join()
-        print("Archivo enviado")
 
     def store_a_file(self, file_direction: str):
         key = sha1_hash(file_direction)
@@ -114,8 +118,9 @@ class KademliaNode(KademliaRpcNode):
 
     def send_store_file(self, nodes, key, file_direction):
         threads = []
+        time.sleep(0.5)
         while len(nodes) > 0:
-            for node in nodes[alpha:]:
+            for node in nodes[:alpha]:
                 print(f"sending a store to {node} on {key}")
                 thread = threading.Thread(
                     target=self.store,
@@ -131,8 +136,68 @@ class KademliaNode(KademliaRpcNode):
                 th.join()
                 nodes.pop()
 
-    def get_data(self, data_id: str):
-        print("manana lo termino")
+    # get values
+    def get_playlist(self, playlist_id: str):
+        print("buscando la playlist: ", playlist_id)
+        key = sha1_hash(playlist_id)
+        nodes = self.node_lookup(key)
+        threads = []
+        self.searched_data[key] = None
+        while len(nodes) > 0:
+            time.sleep(0.5)
+            for node in nodes[:alpha]:
+                print(f"sending a find_value to {node} for {key}")
+                thread = threading.Thread(
+                    target=self.wait_for_playlist,
+                    args=[
+                        key,
+                        node,
+                        (DataType.Data, playlist_id),
+                    ],
+                )
+                threads.append(thread)
+                thread.start()
+            if self.searched_data[key] is not None:
+                value = self.searched_data[key]
+                del self.searched_data[key]
+                return value
+            for th in threads:
+                th.join()
+                nodes.pop()
+
+    def wait_for_playlist(self, key: int, node: Node, data: Tuple[DataType, str]):
+        value = self.find_value(key, node, data)
+        if value is not None:
+            with lock:
+                self.searched_data[key] = value
+        print("encontrado: ", value)
+
+    def get_a_file(self, key: int):
+        print("buscando la cancion: ", key)
+        nodes = self.node_lookup(key)
+        threads = []
+        self.searched_data[key] = None
+        while len(nodes) > 0:
+            time.sleep(0.5)
+            for node in nodes[:alpha]:
+                print(f"sending a find_value to {node} for {key}")
+                thread = threading.Thread(
+                    target=self.wait_for_playlist,
+                    args=[
+                        key,
+                        node,
+                        (DataType.File, "any"),
+                    ],
+                )
+                threads.append(thread)
+                thread.start()
+            if self.searched_data[key] is not None:
+                value = self.searched_data[key]
+                del self.searched_data[key]
+                return value
+            for th in threads:
+                th.join()
+                nodes.pop()
 
     def refresh_buckets(self):
         while True:

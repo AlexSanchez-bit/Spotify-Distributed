@@ -135,10 +135,47 @@ class KademliaRpcNode(RpcNode):
             ),
         )
 
-    def find_value(self, key: int, data_type: DataType, node: Node):
+    def find_value(self, key: int, node: Node, data: Tuple[DataType, str]):
+        data_type, _ = data
+        if data_type is DataType.Data:
+            return self.find_value_data(key, node, data)
+        else:
+            return self.find_value_file(key, node)
+
+    def find_value_file(self, key: int, node: Node):
         try:
+            filetransfer = FileTransfer(self.ip)
+            direction = filetransfer.direction()
+            identifier = f"{key}{direction}"
+            self.file_transfers[identifier] = True
+            start_time = time.time()
             self.network.send_rpc(
-                node, Rpc(RpcType.FindValue, MessageType.Request, (key, data_type))
+                node,
+                Rpc(
+                    RpcType.FindValue,
+                    MessageType.Request,
+                    (key, DataType.File, direction),
+                ),
+            )
+            while time.time() - start_time < timeout:
+                time.sleep(0.5)
+                if not self.file_transfers[identifier]:
+                    del self.file_transfers[identifier]
+                    filetransfer.receive_file(f"./songs/{key}.mp4")
+                    filetransfer.close_transmission()
+                    return f"./songs/{key}.mp3"
+            return "Conection TimeOut"
+        except Exception as e:
+            print("error findin a file {key}: ", e)
+            return None
+
+    def find_value_data(self, key: int, node: Node, data: Tuple[DataType, str]):
+        try:
+            data_type, elid = data
+            self.network.send_rpc(
+                node,
+                Rpc(RpcType.FindValue, MessageType.Request,
+                    (key, data_type, elid)),
             )
             identifier = f"{key}{node.id}"
             self.values_requests[f"{key}{node.id}"] = None
@@ -148,11 +185,7 @@ class KademliaRpcNode(RpcNode):
                 if self.values_requests[f"{key}{node.id}"] is not None:
                     ret_val = self.values_requests[identifier]
                     del self.values_requests[f"{key}{node.id}"]
-                    if data_type is DataType.Data:
-                        return ret_val
-                    else:
-                        print(f"se obtuvo la respuesta {ret_val}")
-                        return None
+                    return ret_val
             print(f"Timeout Exceeded: on key {key} for {node}")
             return None
         except Exception as e:
@@ -169,8 +202,8 @@ class KademliaRpcNode(RpcNode):
             key, value = payload
             self.handle_store(key, address, value, message_type)
         if rpc_type == RpcType.FindValue:
-            key, data_type = payload
-            self.handle_find_value(key, address, data_type, message_type)
+            key, data_type, data = payload
+            self.handle_find_value(key, address, data_type, message_type, data)
 
     def handle_ping(self, node, message_type):
         if message_type == MessageType.Request:
@@ -223,7 +256,7 @@ class KademliaRpcNode(RpcNode):
                     Rpc(
                         RpcType.Store,
                         MessageType.Response,
-                        (key, (action, type, (port, file_transfers.port))),
+                        (key, (action, data_type, (port, file_transfers.port))),
                     ),
                 )
                 file_transfers.receive_file(f"./songs/{key}.mp3")
@@ -238,7 +271,7 @@ class KademliaRpcNode(RpcNode):
                             Rpc(
                                 RpcType.Store,
                                 MessageType.Response,
-                                (key, (action, type, "OK")),
+                                (key, (action, data_type, "OK")),
                             ),
                         )
                 except Exception as e:
@@ -248,12 +281,14 @@ class KademliaRpcNode(RpcNode):
                         Rpc(
                             RpcType.Store,
                             MessageType.Response,
-                            (key, (action, type, f"{e} on {data.name}")),
+                            (key, (action, data_type, f"{e} on {data.name}")),
                         ),
                     )
         if type is MessageType.Response:
             print(node, " respondio con ", data, " al store ", key)
+            print("el datatype: ", data_type)
             if data_type is DataType.File:
+                print("es un file")
                 request_port, peer_port = data
                 identifier = f"{key}{request_port}"
                 try:
@@ -271,5 +306,31 @@ class KademliaRpcNode(RpcNode):
                 else:
                     print(f"Error on action over playlist {key}{node.id}")
 
-    def handle_find_value(self, key, address, data_type, message_type):
-        print("llego un find_value wajajajaj", key, address, data_type, message_type)
+    def handle_find_value(self, key, address, data_type, message_type, data):
+        if message_type is MessageType.Request:
+            if data_type is DataType.Data:
+                self.network.send_rpc(
+                    address,
+                    Rpc(
+                        RpcType.FindValue,
+                        MessageType.Response,
+                        (key, DataType.Data, self.database.get_by_id(data)),
+                    ),
+                )
+            else:
+                self.network.send_rpc(
+                    address,
+                    Rpc(
+                        RpcType.FindValue,
+                        MessageType.Response,
+                        (key, DataType.Data, data),
+                    ),
+                )
+                filetransfer = FileTransfer(self.ip, f"./songs/{key}.mp3")
+                filetransfer.start_trasmission(data)
+                filetransfer.close_transmission()
+        if message_type is MessageType.Response:
+            if data_type is DataType.Data:
+                self.values_requests[f"{key}{address.id}"] = data
+            else:
+                self.file_transfers[f"{key}{data}"] = False

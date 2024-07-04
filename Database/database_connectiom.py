@@ -34,11 +34,17 @@ class Playlist:
             "id": self.id,
         }
 
+    def __eq__(self, o):
+        return self.id == o.id
+
     @classmethod
     def from_dict(cls, data):
         playlist = cls(data["title"], data["author"], data["id"])
         playlist.songs = [Song.from_dict(song_data) for song_data in data["songs"]]
         return playlist
+
+    def __str__(self):
+        return f"{'{'}title:{self.title},author:{self.author}{'}'}"
 
 
 class PlaylistManager:
@@ -49,7 +55,7 @@ class PlaylistManager:
     def get_all(self):
         return self.playlists
 
-    def bet_by_id(self, id):
+    def get_by_id(self, id):
         return next((item for item in self.playlists if item.id == id), None)
 
     def make_action(self, action: StoreAction, playlist_data: Playlist):
@@ -61,9 +67,7 @@ class PlaylistManager:
                 for item in self.playlists
             ]
         elif action == StoreAction.DELETE:
-            self.playlists = [
-                item for item in self.playlists if item.id != playlist_data.id
-            ]
+            self.playlists.remove(playlist_data)
         self.save_snapshop()
 
     def add_playlist(self, playlist: Playlist):
@@ -96,5 +100,3 @@ class PlaylistManager:
             return cls.from_dict(data)
         except Exception:
             return None
-
-    # ... (resto de los métodos de la clase PlaylistManager)

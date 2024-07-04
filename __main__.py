@@ -1,6 +1,6 @@
 import sys
 from Database.database_connectiom import Playlist
-from Kademlia.KBucket import Node
+from Kademlia.KBucket import Node, sha1_hash
 from Kademlia.KademliaNode import KademliaNode
 import os
 import time
@@ -29,17 +29,22 @@ def main():
     for ip, port in default_nodes:
         print(node.ping(Node(ip, port)))
     id = f"{time.time()}"
+    time.sleep(0.2)
+    id2 = f"{time.time()}"
     node.store_playlist(
         StoreAction.INSERT, Playlist("ocaso de la lluvia vieja", "yo", id)
     )
     node.store_playlist(
-        StoreAction.UPDATE,
-        Playlist("mi nene es preciosa", "para mi nene", f"1719895112.9160979"),
+        StoreAction.INSERT, Playlist("la nene mas linda del mundo", "yo", id2)
     )
     node.store_playlist(
         StoreAction.DELETE,
         Playlist("", "", id),
     )
+    node.get_playlist(id2)
+
+    node.store_a_file("audio.mp3")
+    node.get_a_file(sha1_hash("audio.mp3"))
 
     while True:
         file_direction = input("ip: ")
