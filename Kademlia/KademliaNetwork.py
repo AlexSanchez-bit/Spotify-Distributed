@@ -52,7 +52,6 @@ class KademliaNetwork:
             )
             respond_thread.start()
 
-            self.refresh_k_buckets(sender)
             refresh_thread = threading.Thread(
                 target=self.refresh_k_buckets, args=[sender]
             )

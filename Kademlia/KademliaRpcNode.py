@@ -16,8 +16,6 @@ import time
 
 lock = threading.Lock()
 
-alfa = 3  # the number of paralel calls on node search rpcs
-
 timeout = 4
 
 
@@ -96,16 +94,6 @@ class KademliaRpcNode(RpcNode):
                 time.sleep(0.5)
             return "OK"
 
-    def store_response(self, key, node, value):
-        self.network.send_rpc(
-            node,
-            Rpc(
-                RpcType.Store,
-                MessageType.Response,
-                (key, "Ok"),
-            ),
-        )
-
     def find_node(
         self,
         target_id: int,
@@ -157,13 +145,14 @@ class KademliaRpcNode(RpcNode):
                     (key, DataType.File, direction),
                 ),
             )
+            filetransfer.receive_file(f"./songs/{key}.mp4")
             while time.time() - start_time < timeout:
                 time.sleep(0.5)
-                if not self.file_transfers[identifier]:
-                    del self.file_transfers[identifier]
-                    filetransfer.receive_file(f"./songs/{key}.mp4")
-                    filetransfer.close_transmission()
-                    return f"./songs/{key}.mp3"
+                with lock:
+                    if not self.file_transfers[identifier]:
+                        del self.file_transfers[identifier]
+                        filetransfer.close_transmission()
+                        return f"./songs/{key}.mp3"
             return "Conection TimeOut"
         except Exception as e:
             print("error findin a file {key}: ", e)
@@ -323,14 +312,16 @@ class KademliaRpcNode(RpcNode):
                     Rpc(
                         RpcType.FindValue,
                         MessageType.Response,
-                        (key, DataType.Data, data),
+                        (key, DataType.File, data),
                     ),
                 )
                 filetransfer = FileTransfer(self.ip, f"./songs/{key}.mp3")
+                print("enviando a: ", data, address)
                 filetransfer.start_trasmission(data)
                 filetransfer.close_transmission()
         if message_type is MessageType.Response:
             if data_type is DataType.Data:
                 self.values_requests[f"{key}{address.id}"] = data
             else:
+                print("*********llego como respuesta del find_value: ", data)
                 self.file_transfers[f"{key}{data}"] = False
