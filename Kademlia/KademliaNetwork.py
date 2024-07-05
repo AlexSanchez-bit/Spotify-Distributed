@@ -10,6 +10,7 @@ from Kademlia.utils.MessageType import MessageType
 from Kademlia.utils.Rpc import Rpc
 from Kademlia.utils.RpcNode import RpcNode
 from Kademlia.utils.RpcType import RpcType
+from Kademlia.utils.Syncronization.LamportClock import LamportClock
 
 lock = threading.Lock()
 
@@ -25,6 +26,7 @@ class KademliaNetwork:
         """
 
         self.node = node
+        self.clock = LamportClock()
         self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.server_socket.bind((node.ip, node.port))
         self.sended_pings = []
@@ -34,7 +36,8 @@ class KademliaNetwork:
         """
         Send An Encoded rpc to the peer
         """
-        message = pickle.dumps(rpc)
+        message = pickle.dumps((rpc, self.clock.ticks))
+        self.clock.tick()
         with lock:
             self.server_socket.sendto(message, (node.ip, node.port))
 
@@ -46,12 +49,14 @@ class KademliaNetwork:
             message, address = self.server_socket.recvfrom(4096)
             ip, port = address
             sender = Node(ip, port)
-            rpc = pickle.loads(message)
+            rpc, ticks = pickle.loads(message)
             respond_thread = threading.Thread(
-                target=self.node.handle_rpc, args=[sender, rpc]
+                target=self.node.handle_rpc, args=[
+                    sender, rpc, self.clock.ticks]
             )
             respond_thread.start()
 
+            self.clock.merge_ticks(ticks)
             refresh_thread = threading.Thread(
                 target=self.refresh_k_buckets, args=[sender]
             )

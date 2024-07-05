@@ -40,7 +40,8 @@ class Playlist:
     @classmethod
     def from_dict(cls, data):
         playlist = cls(data["title"], data["author"], data["id"])
-        playlist.songs = [Song.from_dict(song_data) for song_data in data["songs"]]
+        playlist.songs = [Song.from_dict(song_data)
+                          for song_data in data["songs"]]
         return playlist
 
     def __str__(self):
@@ -49,7 +50,7 @@ class Playlist:
 
 class PlaylistManager:
     def __init__(self):
-        saved = self.load_from_json("../data/store.json")
+        saved = self.load_from_json("data/store.json")
         self.playlists = saved.playlists if saved is not None else []
 
     def get_all(self):

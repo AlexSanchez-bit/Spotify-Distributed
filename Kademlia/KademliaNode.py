@@ -1,4 +1,5 @@
 from collections import defaultdict
+import os
 from typing import Any, List, Optional, Tuple
 from Database.database_connectiom import Playlist
 from Kademlia.KBucket import Node, K, sha1_hash
@@ -73,7 +74,6 @@ class KademliaNode(KademliaRpcNode):
         start_time = time.time()
         while time.time() - start_time < timeout:
             with lock:
-                print("lo nodos pedios", self.requested_nodes)
                 if target_id in self.requested_nodes:
                     response = self.requested_nodes[target_id]
                     del self.requested_nodes[target_id]
@@ -142,7 +142,7 @@ class KademliaNode(KademliaRpcNode):
         key = sha1_hash(playlist_id)
         nodes = self.node_lookup(key)
         threads = []
-        self.searched_data[key] = None
+        self.searched_data[key] = []
         while len(nodes) > 0:
             time.sleep(0.5)
             for node in nodes[:alpha]:
@@ -157,26 +157,41 @@ class KademliaNode(KademliaRpcNode):
                 )
                 threads.append(thread)
                 thread.start()
-            if self.searched_data[key] is not None:
-                value = self.searched_data[key]
-                del self.searched_data[key]
-                return value
             for th in threads:
                 th.join()
                 nodes.pop()
+
+        if self.searched_data[key] is None:
+            del self.searched_data[key]
+            return None
+        returned_values = self.searched_data[key]
+        del self.searched_data[key]
+        returned_values.sort(key=lambda x: x[1], reverse=True)
+        ret_val, _ = returned_values[0]
+        th = threading.Thread(
+            target=self.sincronize_peer_data, args=[ret_val, DataType.Data]
+        )  # sincronize the highest clock in all k nearest nodes
+        th.start()
+        return ret_val
 
     def wait_for_playlist(self, key: int, node: Node, data: Tuple[DataType, str]):
         value = self.find_value(key, node, data)
         if value is not None:
             with lock:
-                self.searched_data[key] = value
+                self.searched_data[key].append(value)
         print("encontrado: ", value)
+
+    def sincronize_peer_data(self, latest_value, data_type):
+        if data_type is DataType.Data:
+            self.store_playlist(StoreAction.UPDATE, latest_value)
+        else:
+            self.store_a_file(latest_value)
 
     def get_a_file(self, key: int):
         print("buscando la cancion: ", key)
         nodes = self.node_lookup(key)
         threads = []
-        self.searched_data[key] = None
+        self.searched_data[key] = []
         while len(nodes) > 0:
             time.sleep(0.5)
             for node in nodes[:alpha]:
@@ -191,13 +206,23 @@ class KademliaNode(KademliaRpcNode):
                 )
                 threads.append(thread)
                 thread.start()
-            if self.searched_data[key] is not None:
-                value = self.searched_data[key]
-                del self.searched_data[key]
-                return value
             for th in threads:
                 th.join()
                 nodes.pop()
+        returned_values = self.searched_data[key]
+        del self.searched_data[key]
+        returned_values.sort(key=lambda x: x[1], reverse=True)
+        ret_val, _ = returned_values[0]
+        th = threading.Thread(
+            target=self.sincronize_peer_data, args=[ret_val, DataType.File]
+        )  # sincronize the highest clock in all k nearest nodes
+        th.start()
+
+        for resp_file, clock in returned_values[1:]:
+            if resp_file is not None:  # remove excedent files
+                os.remove(resp_file)
+
+        return ret_val
 
     def refresh_buckets(self):
         while True:

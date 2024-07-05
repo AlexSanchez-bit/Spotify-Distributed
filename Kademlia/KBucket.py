@@ -39,9 +39,6 @@ class KBucket:
 
     def add_node(self, node: Node):
         if node in self.nodes:
-            index = self.nodes.index(node)
-            if index != len(self.nodes) - 1:
-                self.nodes = self.nodes[0:index] + self.nodes[index + 1 :]
             return None
         elif len(self.nodes) <= K:
             self.nodes.append(node)

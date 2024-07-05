@@ -20,5 +20,5 @@ class RpcNode(Node):
     def find_value(self, key: int, node: Node):
         pass
 
-    def handle_rpc(self, address, rpc):
+    def handle_rpc(self, address, rpc, clock_ticks):
         pass

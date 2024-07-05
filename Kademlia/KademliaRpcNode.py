@@ -135,7 +135,7 @@ class KademliaRpcNode(RpcNode):
             filetransfer = FileTransfer(self.ip)
             direction = filetransfer.direction()
             identifier = f"{key}{direction}"
-            self.file_transfers[identifier] = True
+            self.file_transfers[identifier] = (True, 0)
             start_time = time.time()
             self.network.send_rpc(
                 node,
@@ -145,14 +145,16 @@ class KademliaRpcNode(RpcNode):
                     (key, DataType.File, direction),
                 ),
             )
-            filetransfer.receive_file(f"./songs/{key}.mp4")
+            filetransfer.receive_file(f"./songs/{node.id}{key}.mp4")
             while time.time() - start_time < timeout:
                 time.sleep(0.5)
                 with lock:
-                    if not self.file_transfers[identifier]:
+                    if not self.file_transfers[identifier][0]:
+                        _, clock_ticks = self.file_transfers[identifier]
                         del self.file_transfers[identifier]
                         filetransfer.close_transmission()
-                        return f"./songs/{key}.mp3"
+                        return (f"./songs/{key}.mp3", clock_ticks)
+            filetransfer.close_transmission()
             return "Conection TimeOut"
         except Exception as e:
             print("error findin a file {key}: ", e)
@@ -181,7 +183,7 @@ class KademliaRpcNode(RpcNode):
             print(f"error buscando la llave {key} - > {e}")
             return None
 
-    def handle_rpc(self, address, rpc):
+    def handle_rpc(self, address, rpc, clock_ticks):
         rpc_type, message_type, payload = rpc
         if rpc_type == RpcType.Ping:
             self.handle_ping(address, message_type)
@@ -192,7 +194,9 @@ class KademliaRpcNode(RpcNode):
             self.handle_store(key, address, value, message_type)
         if rpc_type == RpcType.FindValue:
             key, data_type, data = payload
-            self.handle_find_value(key, address, data_type, message_type, data)
+            self.handle_find_value(
+                key, address, data_type, message_type, data, clock_ticks
+            )
 
     def handle_ping(self, node, message_type):
         if message_type == MessageType.Request:
@@ -295,7 +299,9 @@ class KademliaRpcNode(RpcNode):
                 else:
                     print(f"Error on action over playlist {key}{node.id}")
 
-    def handle_find_value(self, key, address, data_type, message_type, data):
+    def handle_find_value(
+        self, key, address, data_type, message_type, data, clock_ticks
+    ):
         if message_type is MessageType.Request:
             if data_type is DataType.Data:
                 self.network.send_rpc(
@@ -321,7 +327,13 @@ class KademliaRpcNode(RpcNode):
                 filetransfer.close_transmission()
         if message_type is MessageType.Response:
             if data_type is DataType.Data:
-                self.values_requests[f"{key}{address.id}"] = data
+                self.values_requests[f"{key}{address.id}"] = (
+                    data, clock_ticks)
             else:
-                print("*********llego como respuesta del find_value: ", data)
-                self.file_transfers[f"{key}{data}"] = False
+                print(
+                    "*********llego como respuesta del find_value: ",
+                    data,
+                    " para ",
+                    address,
+                )
+                self.file_transfers[f"{key}{data}"] = (False, clock_ticks)
