@@ -1,20 +1,24 @@
 import json
+import threading
+import time
 
 from Kademlia.utils.StoreAction import StoreAction
 
+lock = threading.Lock()
+
 
 class Song:
-    def __init__(self, name, author):
+    def __init__(self, name, author, key):
         self.name = name
         self.author = author
-        self.key = self.generate_key()
+        self.key = key
 
     def to_dict(self):
         return {"name": self.name, "author": self.author, "key": self.key}
 
     @classmethod
     def from_dict(cls, data):
-        song = cls(data["name"], data["author"])
+        song = cls(data["name"], data["author"], data["key"])
         song.key = data["key"]
         return song
 
@@ -52,6 +56,7 @@ class PlaylistManager:
     def __init__(self):
         saved = self.load_from_json("data/store.json")
         self.playlists = saved.playlists if saved is not None else []
+        self.actions_registered = []
 
     def get_all(self):
         return self.playlists
@@ -59,7 +64,13 @@ class PlaylistManager:
     def get_by_id(self, id):
         return next((item for item in self.playlists if item.id == id), None)
 
-    def make_action(self, action: StoreAction, playlist_data: Playlist):
+    def make_action(self, action: StoreAction, playlist_data: Playlist, order: int):
+        with lock:
+            self.actions_registered.append((action, playlist_data, order))
+            self.actions_registered.sort(key=lambda x: x[2])
+            time.sleep(0.1)
+
+        action, playlist_data, _ = self.actions_registered.pop()
         if action == StoreAction.INSERT:
             self.add_playlist(playlist_data)
         elif action == StoreAction.UPDATE:

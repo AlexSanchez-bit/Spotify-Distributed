@@ -1,7 +1,7 @@
 import hashlib
 from typing import List
 
-K = 2  # Número de nodos en cada k-bucket
+K = 20  # Número de nodos en cada k-bucket
 ID_LENGTH = 160  # Longitud de los identificadores en bits
 
 

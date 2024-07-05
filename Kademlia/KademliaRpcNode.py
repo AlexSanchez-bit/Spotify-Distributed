@@ -191,7 +191,7 @@ class KademliaRpcNode(RpcNode):
             self.handle_find_node(message_type, address, payload)
         if rpc_type == RpcType.Store:
             key, value = payload
-            self.handle_store(key, address, value, message_type)
+            self.handle_store(key, address, value, message_type, clock_ticks)
         if rpc_type == RpcType.FindValue:
             key, data_type, data = payload
             self.handle_find_value(
@@ -237,6 +237,7 @@ class KademliaRpcNode(RpcNode):
         node,
         value: Tuple[StoreAction, DataType, Any],
         type: MessageType = MessageType.Request,
+        clock_tick=1,
     ):
         action, data_type, data = value
         if type is MessageType.Request:
@@ -258,7 +259,7 @@ class KademliaRpcNode(RpcNode):
                 print("recibido : ", data, " para: ", action)
                 try:
                     with lock:
-                        self.database.make_action(action, data)
+                        self.database.make_action(action, data, clock_tick)
                         self.network.send_rpc(
                             node,
                             Rpc(
