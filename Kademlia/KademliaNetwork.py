@@ -64,12 +64,15 @@ class KademliaNetwork:
 
     def refresh_k_buckets(self, node: Node):
         least = self.node.routing_table.add_node(node)
-        if least is not None:
-            result = self.node.ping(least, MessageType.Request)
-            if not result:
+        with lock:
+            if least is not None:
+                result = self.node.ping(least, MessageType.Request)
                 index = self.node.routing_table.get_bucket_index(least)
                 self.node.routing_table.buckets[index].remove_node(least)
-                self.node.routing_table.add_node(node)
+                if not result:
+                    self.node.routing_table.add_node(node)
+                else:
+                    self.node.routing_table.add_node(least)
 
     def start(self):
         print("starting network")
