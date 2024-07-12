@@ -1,0 +1,59 @@
+services:
+  node1:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - .:/app
+    networks:
+      - kademlia-network
+    cap_add:
+      - NET_BROADCAST
+
+  node2:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - .:/app
+    networks:
+      - kademlia-network
+    cap_add:
+      - NET_BROADCAST
+
+  node3:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - .:/app
+    networks:
+      - kademlia-network
+    cap_add:
+      - NET_BROADCAST
+
+  node4:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - .:/app
+    networks:
+      - kademlia-network
+    cap_add:
+      - NET_BROADCAST
+
+  node5:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - .:/app
+    networks:
+      - kademlia-network
+    cap_add:
+      - NET_BROADCAST
+
+networks:
+  kademlia-network:
+    driver: bridge

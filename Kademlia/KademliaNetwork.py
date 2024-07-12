@@ -50,13 +50,14 @@ class KademliaNetwork:
             ip, port = address
             sender = Node(ip, port)
             rpc, ticks = pickle.loads(message)
+            self.clock.tick()
+            self.clock.merge_ticks(ticks)
+
             respond_thread = threading.Thread(
-                target=self.node.handle_rpc, args=[
-                    sender, rpc, self.clock.ticks]
+                target=self.node.handle_rpc, args=[sender, rpc, self.clock.ticks]
             )
             respond_thread.start()
 
-            self.clock.merge_ticks(ticks)
             refresh_thread = threading.Thread(
                 target=self.refresh_k_buckets, args=[sender]
             )
@@ -64,15 +65,14 @@ class KademliaNetwork:
 
     def refresh_k_buckets(self, node: Node):
         least = self.node.routing_table.add_node(node)
-        with lock:
-            if least is not None:
-                result = self.node.ping(least, MessageType.Request)
-                index = self.node.routing_table.get_bucket_index(least)
-                self.node.routing_table.buckets[index].remove_node(least)
-                if not result:
-                    self.node.routing_table.add_node(node)
-                else:
-                    self.node.routing_table.add_node(least)
+        if least is not None:
+            result = self.node.ping(least, MessageType.Request)
+            index = self.node.routing_table.get_bucket_index(least.id)
+            self.node.routing_table.buckets[index].remove_node(least)
+            if not result:
+                self.node.routing_table.add_node(node)
+            else:
+                self.node.routing_table.add_node(least)
 
     def start(self):
         print("starting network")
