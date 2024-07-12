@@ -5,10 +5,11 @@ FROM python:3.11
 WORKDIR /app
 
 COPY . .
-# Define el entrypoint
+# Instalar las dependencias
+RUN pip install --no-cache-dir -r requirements.txt
 RUN chmod +x entrypoint.sh
 
 ENTRYPOINT ["./entrypoint.sh"]
 
 # Ejecutar el script principal
-CMD ["python", "__main__.py"]
+CMD ["python", "main.py"]

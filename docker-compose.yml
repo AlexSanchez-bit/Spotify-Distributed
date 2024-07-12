@@ -1,5 +1,5 @@
 services:
-  app1:
+  node1:
     build:
       context: .
       dockerfile: Dockerfile
@@ -7,8 +7,10 @@ services:
       - .:/app
     networks:
       - kademlia-network
+    cap_add:
+      - NET_BROADCAST
 
-  app2:
+  node2:
     build:
       context: .
       dockerfile: Dockerfile
@@ -16,8 +18,10 @@ services:
       - .:/app
     networks:
       - kademlia-network
+    cap_add:
+      - NET_BROADCAST
 
-  app3:
+  node3:
     build:
       context: .
       dockerfile: Dockerfile
@@ -25,8 +29,10 @@ services:
       - .:/app
     networks:
       - kademlia-network
+    cap_add:
+      - NET_BROADCAST
 
-  app4:
+  node4:
     build:
       context: .
       dockerfile: Dockerfile
@@ -34,8 +40,10 @@ services:
       - .:/app
     networks:
       - kademlia-network
+    cap_add:
+      - NET_BROADCAST
 
-  app5:
+  node5:
     build:
       context: .
       dockerfile: Dockerfile
@@ -43,7 +51,11 @@ services:
       - .:/app
     networks:
       - kademlia-network
+    cap_add:
+      - NET_BROADCAST
 
 networks:
   kademlia-network:
     driver: bridge
+    driver_opts:
+      com.docker.network.driver.mtu: 1500
