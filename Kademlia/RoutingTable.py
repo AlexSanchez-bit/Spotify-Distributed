@@ -43,7 +43,7 @@ class RoutingTable:
         """
         bucket_index = self.get_bucket_index(target_id)
         closest_nodes = self.buckets[bucket_index].get_nodes()
-        for i in range(1, ID_LENGTH):
+        for i in range(0, ID_LENGTH):
             if len(closest_nodes) >= count:
                 break
             if bucket_index - i >= 0:
