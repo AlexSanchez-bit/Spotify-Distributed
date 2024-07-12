@@ -14,6 +14,8 @@ import threading
 from Kademlia.utils.StoreAction import StoreAction
 import time
 
+from RaftConsensus.utils.Server import Server
+
 lock = threading.Lock()
 
 timeout = 4
@@ -30,6 +32,10 @@ class KademliaRpcNode(RpcNode):
         self.file_transfers = {}
         self.values_requests = {}
         self.pings = {}
+
+        self.consensus = Server(
+            Node(self.ip, self.port, self.id), self.network, self.routing_table
+        )
 
     def ping(self, node: Node, type: MessageType = MessageType.Request):
         print("making ping to", node)
@@ -165,8 +171,7 @@ class KademliaRpcNode(RpcNode):
             data_type, elid = data
             self.network.send_rpc(
                 node,
-                Rpc(RpcType.FindValue, MessageType.Request,
-                    (key, data_type, elid)),
+                Rpc(RpcType.FindValue, MessageType.Request, (key, data_type, elid)),
             )
             identifier = f"{key}{node.id}"
             self.values_requests[f"{key}{node.id}"] = None
@@ -197,6 +202,8 @@ class KademliaRpcNode(RpcNode):
             self.handle_find_value(
                 key, address, data_type, message_type, data, clock_ticks
             )
+        else:
+            print(address, rpc)
 
     def handle_ping(self, node, message_type):
         if message_type == MessageType.Request:
@@ -328,8 +335,7 @@ class KademliaRpcNode(RpcNode):
                 filetransfer.close_transmission()
         if message_type is MessageType.Response:
             if data_type is DataType.Data:
-                self.values_requests[f"{key}{address.id}"] = (
-                    data, clock_ticks)
+                self.values_requests[f"{key}{address.id}"] = (data, clock_ticks)
             else:
                 print(
                     "*********llego como respuesta del find_value: ",

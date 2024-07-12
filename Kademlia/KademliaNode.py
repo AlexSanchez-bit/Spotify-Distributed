@@ -21,11 +21,14 @@ class KademliaNode(KademliaRpcNode):
     def __init__(self, ip: str, port: int):
         super().__init__(ip, port)
         self.searched_data = {}
+        self.leader_node = None
 
     # Find Nodes on the network
 
     def node_lookup(self, target_id: int) -> List[Node]:
-        shortlist = self.routing_table.find_closest_nodes(target_id, K)
+        shortlist = self.routing_table.find_closest_nodes(target_id, K) + [
+            Node(self.ip, self.port, self.id)
+        ]
         already_queried = set()
         closest_nodes = []
 
@@ -41,8 +44,7 @@ class KademliaNode(KademliaRpcNode):
                 if node.id not in already_queried:
                     already_queried.add(node.id)
                     thread = threading.Thread(
-                        target=self._query_node, args=(
-                            node, target_id, shortlist)
+                        target=self._query_node, args=(node, target_id, shortlist)
                     )
                     threads.append(thread)
                     thread.start()
@@ -110,11 +112,11 @@ class KademliaNode(KademliaRpcNode):
         for th in threads:
             th.join()
 
-    def store_a_file(self, file_direction: str):
-        key = sha1_hash(file_direction)
+    def store_a_file(self, file_direction: str, key_save: Optional[int] = None):
+        key = sha1_hash(file_direction) if key_save is None else key_save
         nodes = self.node_lookup(key)
         resp = self.send_store_file(nodes, key, file_direction)
-        print(resp)
+        print("respuesta del store file: ", resp)
 
     def send_store_file(self, nodes, key, file_direction):
         threads = []
@@ -141,6 +143,9 @@ class KademliaNode(KademliaRpcNode):
         print("buscando la playlist: ", playlist_id)
         key = sha1_hash(playlist_id)
         nodes = self.node_lookup(key)
+        if len(nodes) == 0:
+            print("El valor buscano no esta en la red")
+            return None
         threads = []
         self.searched_data[key] = []
         while len(nodes) > 0:
@@ -164,7 +169,7 @@ class KademliaNode(KademliaRpcNode):
         if self.searched_data[key] is None:
             del self.searched_data[key]
             return None
-        returned_values = self.searched_data[key]
+        returned_values = list(filter(lambda x: x is not None, self.searched_data[key]))
         del self.searched_data[key]
         returned_values.sort(key=lambda x: x[1], reverse=True)
         ret_val, _ = returned_values[0]
@@ -181,11 +186,12 @@ class KademliaNode(KademliaRpcNode):
                 self.searched_data[key].append(value)
         print("encontrado: ", value)
 
-    def sincronize_peer_data(self, latest_value, data_type):
+    def sincronize_peer_data(self, latest_value, data_type, original_key=None):
         if data_type is DataType.Data:
             self.store_playlist(StoreAction.UPDATE, latest_value)
         else:
-            self.store_a_file(latest_value)
+            print("archivo a actualizar: ", latest_value)
+            self.store_a_file(latest_value, original_key)
 
     def get_a_file(self, key: int):
         print("buscando la cancion: ", key)
@@ -212,6 +218,9 @@ class KademliaNode(KademliaRpcNode):
         returned_values = self.searched_data[key]
         del self.searched_data[key]
         returned_values.sort(key=lambda x: x[1], reverse=True)
+        if len(returned_values) == 0:
+            print("valor no encontrado", key)
+            return None
         ret_val, _ = returned_values[0]
         th = threading.Thread(
             target=self.sincronize_peer_data, args=[ret_val, DataType.File]
