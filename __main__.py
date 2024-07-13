@@ -7,18 +7,7 @@ import time
 
 from Kademlia.utils.StoreAction import StoreAction
 
-default_nodes = [
-    ("127.0.0.1", 8080),
-    ("127.0.0.1", 8081),
-    ("127.0.0.1", 8082),
-    ("127.0.0.1", 8083),
-    ("172.18.0.2", 8080),
-    ("172.18.0.3", 8080),
-    ("172.18.0.4", 8080),
-    ("172.18.0.8", 8080),
-    ("172.18.0.5", 8080),
-    ("172.18.0.9", 8080),
-]
+default_nodes = []
 
 
 def main():
@@ -27,8 +16,9 @@ def main():
     node = KademliaNode(ip, port)
     node.start()
 
-    while True:
-        time.sleep(0.5)
+    for peer_ip in list(node.consensus.network_info.hosts())[:10]:
+        node.ping(Node(str(peer_ip), port))
+    node.node_lookup(node.id)
 
 
 if __name__ == "__main__":

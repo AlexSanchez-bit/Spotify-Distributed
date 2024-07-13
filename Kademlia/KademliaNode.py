@@ -57,7 +57,6 @@ class KademliaNode(KademliaRpcNode):
             # Check if the closest nodes list has stabilized
             if all(node.id in already_queried for node in closest_nodes):
                 break
-
         print("resultado del node_lookup: ", closest_nodes)
         return closest_nodes
 
@@ -235,10 +234,10 @@ class KademliaNode(KademliaRpcNode):
 
     def refresh_buckets(self):
         while True:
-            for bucket in self.routing_table.buckets:
+            for i, bucket in enumerate(self.routing_table.buckets):
                 for node in bucket.get_nodes():
                     self.ping(node)
-            time.sleep(700)
+            time.sleep(10)
 
     def start(self):
         self.network.start()

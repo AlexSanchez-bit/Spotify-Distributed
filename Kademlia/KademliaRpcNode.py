@@ -26,7 +26,7 @@ class KademliaRpcNode(RpcNode):
         super().__init__(ip, port, None)
         self.routing_table = RoutingTable(self.id)
         self.network = KademliaNetwork(self)
-        self.routing_table.add_node(Node(ip, port))
+        self.routing_table.add_node(Node(ip, port, self.id))
         self.database = PlaylistManager()
         self.requested_nodes = {}
         self.file_transfers = {}
@@ -125,7 +125,7 @@ class KademliaRpcNode(RpcNode):
             Rpc(
                 RpcType.FindNode,
                 MessageType.Response,
-                (Node(self.ip, self.port), target_id, result),
+                (Node(self.ip, self.port, self.id), target_id, result),
             ),
         )
 
@@ -202,8 +202,6 @@ class KademliaRpcNode(RpcNode):
             self.handle_find_value(
                 key, address, data_type, message_type, data, clock_ticks
             )
-        else:
-            print(address, rpc)
 
     def handle_ping(self, node, message_type):
         if message_type == MessageType.Request:
@@ -215,7 +213,8 @@ class KademliaRpcNode(RpcNode):
         if message_type == MessageType.Response:
             print("received ping from", node)
             with lock:
-                del self.pings[node.id]
+                if node.id in self.pings:
+                    del self.pings[node.id]
             with lock:
                 if node in self.network.sended_pings:
                     self.network.sended_pings.remove(node)
@@ -232,7 +231,6 @@ class KademliaRpcNode(RpcNode):
             node, target_id, result = payload
             for res_node in result:
                 with lock:
-                    print(self.requested_nodes)
                     if target_id in self.requested_nodes:
                         self.requested_nodes[target_id].append(res_node)
                     else:
