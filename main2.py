@@ -24,9 +24,6 @@ def main():
     port = int(os.getenv("NODE_PORT", 8082))
     node = KademliaNode(ip, port)
     node.start()
-    for ip, port in default_nodes:
-        print(node.ping(Node(ip, port)))
-    node.store_playlist(Playlist("ocaso de la lluvia vieja", "yo", time.time()))
     while True:
         file_direction = input("ip: ")
         node.store_a_file(file_direction)

@@ -1,7 +1,10 @@
 import hashlib
+from threading import Lock
 from typing import List
 
-K = 20  # Número de nodos en cada k-bucket
+lock = Lock()
+
+K = 1  # Número de nodos en cada k-bucket
 ID_LENGTH = 160  # Longitud de los identificadores en bits
 
 
@@ -38,17 +41,23 @@ class KBucket:
         self.nodes = []
 
     def add_node(self, node: Node):
-        if node in self.nodes:
-            return None
-        elif len(self.nodes) <= K:
-            self.nodes.append(node)
-        else:
-            return self.nodes[0]
+        with lock:
+            if node in self.nodes:
+                return None
+
+            if node not in self.nodes and len(self.nodes) < K:
+                self.nodes.append(node)
+                return None
+            else:
+                return self.nodes[0]
 
     def remove_node(self, node: Node):
-        print("removing node: ", node, " from k-bucket")
-        if node in self.nodes:
-            self.nodes.remove(node)
+        print("into removing node")
+        with lock:
+            if node in self.nodes:
+                self.nodes.remove(node)
+        print("finish removing node")
+        print("removing node -- : ", node, " from k-bucket ", self.nodes)
 
     def get_nodes(self) -> List[Node]:
         return self.nodes

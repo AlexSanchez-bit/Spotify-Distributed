@@ -14,6 +14,8 @@ import threading
 from Kademlia.utils.StoreAction import StoreAction
 import time
 
+from RaftConsensus.utils.Server import Server
+
 lock = threading.Lock()
 
 timeout = 4
@@ -24,12 +26,16 @@ class KademliaRpcNode(RpcNode):
         super().__init__(ip, port, None)
         self.routing_table = RoutingTable(self.id)
         self.network = KademliaNetwork(self)
-        self.routing_table.add_node(Node(ip, port))
+        self.routing_table.add_node(Node(ip, port, self.id))
         self.database = PlaylistManager()
         self.requested_nodes = {}
         self.file_transfers = {}
         self.values_requests = {}
         self.pings = {}
+
+        self.consensus = Server(
+            Node(self.ip, self.port, self.id), self.network, self.routing_table
+        )
 
     def ping(self, node: Node, type: MessageType = MessageType.Request):
         print("making ping to", node)
@@ -119,7 +125,7 @@ class KademliaRpcNode(RpcNode):
             Rpc(
                 RpcType.FindNode,
                 MessageType.Response,
-                (Node(self.ip, self.port), target_id, result),
+                (Node(self.ip, self.port, self.id), target_id, result),
             ),
         )
 
@@ -165,8 +171,7 @@ class KademliaRpcNode(RpcNode):
             data_type, elid = data
             self.network.send_rpc(
                 node,
-                Rpc(RpcType.FindValue, MessageType.Request,
-                    (key, data_type, elid)),
+                Rpc(RpcType.FindValue, MessageType.Request, (key, data_type, elid)),
             )
             identifier = f"{key}{node.id}"
             self.values_requests[f"{key}{node.id}"] = None
@@ -208,7 +213,8 @@ class KademliaRpcNode(RpcNode):
         if message_type == MessageType.Response:
             print("received ping from", node)
             with lock:
-                del self.pings[node.id]
+                if node.id in self.pings:
+                    del self.pings[node.id]
             with lock:
                 if node in self.network.sended_pings:
                     self.network.sended_pings.remove(node)
@@ -225,7 +231,6 @@ class KademliaRpcNode(RpcNode):
             node, target_id, result = payload
             for res_node in result:
                 with lock:
-                    print(self.requested_nodes)
                     if target_id in self.requested_nodes:
                         self.requested_nodes[target_id].append(res_node)
                     else:
@@ -328,8 +333,7 @@ class KademliaRpcNode(RpcNode):
                 filetransfer.close_transmission()
         if message_type is MessageType.Response:
             if data_type is DataType.Data:
-                self.values_requests[f"{key}{address.id}"] = (
-                    data, clock_ticks)
+                self.values_requests[f"{key}{address.id}"] = (data, clock_ticks)
             else:
                 print(
                     "*********llego como respuesta del find_value: ",
