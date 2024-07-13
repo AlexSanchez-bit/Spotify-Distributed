@@ -5,6 +5,7 @@ name = "pypi"
 
 [packages]
 pydub = "*"
+netifaces = "*"
 
 [dev-packages]
 
