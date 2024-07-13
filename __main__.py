@@ -15,9 +15,9 @@ def main():
     port = int(os.getenv("NODE_PORT", 8080))
     node = KademliaNode(ip, port)
     node.start()
-
-    for peer_ip in list(node.consensus.network_info.hosts())[:10]:
-        node.ping(Node(str(peer_ip), port))
+    # for peer_ip in list(node.consensus.network_info.hosts())[:10]:
+    #     node.ping(Node(str(peer_ip), port))
+    node.ping(Node(node.consensus.broadcast_address, node.port))
     node.node_lookup(node.id)
 
 
