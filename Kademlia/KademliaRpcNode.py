@@ -275,12 +275,12 @@ class KademliaRpcNode(RpcNode):
                                 (str(action), data.id))
                         self.network.send_rpc(
                             node,
-                            Rpc(
-                                RpcType.Store,
-                                MessageType.Response,
-                                (key, (action, data_type, "OK")),
-                            ),
-                        )
+                                              Rpc(
+                                                  RpcType.Store,
+                                                  MessageType.Response,
+                                                  (key, (action, data_type, "OK")),
+                                              ),
+                                              )
                 except Exception as e:
                     print(
                         f"kademlia:rpc ocurrio un error al guardar la playlist", data.id

@@ -68,8 +68,7 @@ class KademliaNetwork:
             self.clock.merge_ticks(ticks)
 
             respond_thread = threading.Thread(
-                target=self.node.handle_rpc, args=[
-                    sender, rpc, self.clock.ticks]
+                target=self.node.handle_rpc, args=[sender, rpc, self.clock.ticks]
             )
             respond_thread.start()
 
