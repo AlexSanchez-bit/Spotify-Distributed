@@ -1,4 +1,4 @@
 #!/bin/sh
 export NODE_IP=$(hostname -i)
-export NODE_PORT=10009
+export NODE_PORT=19009
 exec "$@"

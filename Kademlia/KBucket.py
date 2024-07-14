@@ -4,7 +4,7 @@ from typing import List
 
 lock = Lock()
 
-K = 1  # Número de nodos en cada k-bucket
+K = 20  # Número de nodos en cada k-bucket
 ID_LENGTH = 160  # Longitud de los identificadores en bits
 
 
@@ -60,4 +60,4 @@ class KBucket:
         print("removing node -- : ", node, " from k-bucket ", self.nodes)
 
     def get_nodes(self) -> List[Node]:
-        return self.nodes
+        return [node for node in self.nodes]

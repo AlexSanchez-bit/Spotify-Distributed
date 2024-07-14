@@ -22,6 +22,7 @@ class RoutingTable:
         """
 
         bucket_index = self.get_bucket_index(node.id)
+        print("buckets ", bucket_index)
         if bucket_index >= 0:
             return self.buckets[bucket_index].add_node(node)
         return "ID Not In Range"

@@ -12,4 +12,4 @@ RUN chmod +x entrypoint.sh
 ENTRYPOINT ["./entrypoint.sh"]
 
 # Ejecutar el script principal
-CMD ["python", "__main__.py"]
+CMD ["python", "server.py",">>","logs.txt"]

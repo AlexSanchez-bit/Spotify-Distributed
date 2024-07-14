@@ -2,6 +2,7 @@ import socket
 import pickle
 from time import sleep
 import time
+import struct
 from Kademlia.KBucket import Node
 from typing import Any, Tuple
 import threading
@@ -27,8 +28,21 @@ class KademliaNetwork:
 
         self.node = node
         self.clock = LamportClock()
-        self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.server_socket = socket.socket(
+            socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP
+        )
+        # ttl = struct.pack("b", 1)
+        # self.server_socket.setsockopt(
+        #     socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, ttl)
+        # self.server_socket.setsockopt(
+        #     socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+        self.server_socket.setsockopt(
+            socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.server_socket.bind((node.ip, node.port))
+        mreq = struct.pack("4sl", socket.inet_aton(
+            "224.1.1.1"), socket.INADDR_ANY)
+        self.server_socket.setsockopt(
+            socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
         self.sended_pings = []
         print(f"node {node.id} listenning on {node.ip}:{node.port}")
 
@@ -54,7 +68,8 @@ class KademliaNetwork:
             self.clock.merge_ticks(ticks)
 
             respond_thread = threading.Thread(
-                target=self.node.handle_rpc, args=[sender, rpc, self.clock.ticks]
+                target=self.node.handle_rpc, args=[
+                    sender, rpc, self.clock.ticks]
             )
             respond_thread.start()
 

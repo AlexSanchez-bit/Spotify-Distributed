@@ -29,19 +29,20 @@ class RaftNode(Server):
         self.last_applied = 0
         self.next_index = {}
         self.match_index = {}
-        self.heartbeat_timeout = random.randint(2, 5)
+        self.heartbeat_timeout = random.randint(5, 10)
         self.leader_wait_timeout = random.randint(5, 10)
 
         self.leader: Optional[Node] = None
         self.heartbeat_thread = threading.Thread(target=self.send_heartbeat)
         self.heartbeat_thread.start()
-        self.leader_wait_thread = threading.Thread(target=self.wait_leader_heartbeat)
+        self.leader_wait_thread = threading.Thread(
+            target=self.wait_leader_heartbeat)
         self.leader_wait_thread.start()
         self.apply_thread = threading.Thread(target=self.apply_log)
         self.apply_thread.start()
-        print("raft: iniciando heartbeat de raft")
 
     def send_heartbeat(self):
+        print("raft: iniciando subrutina lider raft")
         while True:
             time.sleep(self.heartbeat_timeout)
             with lock:
@@ -58,16 +59,15 @@ class RaftNode(Server):
     def wait_leader_heartbeat(self):
         while True:
             time.sleep(self.leader_wait_timeout)
-            with lock:
-                if self.state != RaftState.Leader:
-                    if self.leader is None:
-                        self.call_elections()
-                    self.leader_wait_timeout = random.randint(5, 10)
+            print("raft: waiting heartbeat")
+            if self.state != RaftState.Leader and self.leader is None:
+                self.call_elections()
+            self.leader_wait_timeout = random.randint(5, 10)
 
     def call_elections(self):
+        print("raft: calling to elections")
         with lock:
             self.state = RaftState.Candidate
-            print("raft: calling to elections")
             self.current_term += 1
             self.voted_for = self.node.id
             self.votes = 1  # vote for self
@@ -96,13 +96,15 @@ class RaftNode(Server):
                         self.voted_for = address.id
                         self.network.send_rpc(
                             address,
-                            Rpc(RaftRpc.RequestVote, MessageType.Response, "Vote"),
+                            Rpc(RaftRpc.RequestVote,
+                                MessageType.Response, "Vote"),
                         )
                     else:
                         print("raft: not voting for ", address.id)
                         self.network.send_rpc(
                             address,
-                            Rpc(RaftRpc.RequestVote, MessageType.Response, "NoVote"),
+                            Rpc(RaftRpc.RequestVote,
+                                MessageType.Response, "NoVote"),
                         )
             elif message_type == MessageType.Response:
                 if payload == "Vote":
@@ -112,7 +114,8 @@ class RaftNode(Server):
                         if self.votes > self.routing_table.get_node_count() / 2:
                             self.state = RaftState.Leader
                             self.leader = self.node
-                            print(f"raft: {self.node.id} fue seleccionado lider ")
+                            print(
+                                f"raft: {self.node.id} fue seleccionado lider ")
                             self.send_heartbeat()
         elif rpc_type == RaftRpc.LeaderHeartBeat:
             peer_term, peer_log = payload
@@ -147,7 +150,8 @@ class RaftNode(Server):
                     self.match_index[address.id] = len(self.logs) - 1
                     # Verificar si una nueva entrada puede ser comprometida
                     for index in range(self.commit_index + 1, len(self.logs)):
-                        count = sum(1 for n in self.match_index.values() if n >= index)
+                        count = sum(
+                            1 for n in self.match_index.values() if n >= index)
                         if count > self.routing_table.get_node_count() / 2:
                             self.commit_index = index
                             self.apply_log()
@@ -192,15 +196,4 @@ class RaftNode(Server):
                 if self.commit_index > self.last_applied:
                     self.last_applied += 1
                     print(f"raft: Aplicando log de índice {self.last_applied}")
-            time.sleep(1)
-
-    def run(self):
-        while True:
-            with lock:
-                if self.state == RaftState.Leader:
-                    self.send_heartbeat()
-                elif self.state == RaftState.Follower:
-                    self.wait_leader_heartbeat()
-                elif self.state == RaftState.Candidate:
-                    self.call_elections()
             time.sleep(1)

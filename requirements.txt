@@ -1,2 +1,5 @@
 pydub 
 netifaces
+Flask
+Flask-SocketIO
+Flask-CORS

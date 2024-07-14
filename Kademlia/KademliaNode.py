@@ -1,4 +1,6 @@
 from collections import defaultdict
+from copyreg import pickle
+import json
 import os
 from typing import Any, List, Optional, Tuple
 from Database.database_connectiom import Playlist
@@ -26,14 +28,13 @@ class KademliaNode(KademliaRpcNode):
     # Find Nodes on the network
 
     def node_lookup(self, target_id: int) -> List[Node]:
-        shortlist = self.routing_table.find_closest_nodes(target_id, K) + [
-            Node(self.ip, self.port, self.id)
-        ]
+        print("en el node lookup")
+        shortlist = self.routing_table.find_closest_nodes(target_id, K)
         already_queried = set()
         closest_nodes = []
 
         while shortlist:
-            print("short list", shortlist)
+            print("kademlia:lookup: short list", shortlist)
             # Sort shortlist by distance to target_id
             shortlist.sort(key=lambda node: node.id ^ target_id)
             closest_nodes = list(set(shortlist[:K]))
@@ -52,18 +53,20 @@ class KademliaNode(KademliaRpcNode):
             # Wait for all threads to complete
             for thread in threads:
                 thread.join()
-            print("contenido de la shortlist: ", shortlist)
+            print("kademlia:lookup: contenido de la shortlist: ", shortlist)
+            print("kademlia:lookup: already queried: ", list(already_queried))
+            print("kademlia:lookup closest nodes: ", closest_nodes)
 
             # Check if the closest nodes list has stabilized
             if all(node.id in already_queried for node in closest_nodes):
                 break
-        print("resultado del node_lookup: ", closest_nodes)
+        print("kademlia:lookup: resultado del node_lookup: ", closest_nodes)
         return closest_nodes
 
     def _query_node(self, node: Node, target_id: int, shortlist: List[Node]):
         self.find_node(target_id, node)
         response = self._wait_for_response(target_id)
-        print("wait for response dio: ", response)
+        print("kademlia:lookup: wait for response dio: ", response)
         if response:
             new_nodes = response
             with lock:
@@ -80,7 +83,7 @@ class KademliaNode(KademliaRpcNode):
                     del self.requested_nodes[target_id]
                     return response
             time.sleep(0.1)
-        print("timeout passed")
+        print("kademlia:lookup: timeout passed")
         return []
 
     # manage data storage
@@ -89,42 +92,52 @@ class KademliaNode(KademliaRpcNode):
         key = sha1_hash(playlistData.id)
         nodes = self.node_lookup(key)
         resp = self.send_store_playlist(nodes, key, action, playlistData)
-        print(resp)
+        return resp
 
     def send_store_playlist(
         self, nodes, key, action: StoreAction, playlistData: Playlist
     ):
         threads = []
-        for node in nodes:
-            print(f"sending a store to {node} on {key}")
-            thread = threading.Thread(
-                target=self.store,
-                args=[
-                    key,
-                    node,
-                    (action, DataType.Data, playlistData),
-                ],
-            )
-            threads.append(thread)
-            thread.start()
+        responses = []
+        while len(nodes) > 0:
+            for node in nodes[:alpha]:
+                print(f"kademlia:lookup: sending a store to {node} on {key}")
+                thread = threading.Thread(
+                    target=lambda key, node, rpc: responses.append(
+                        self.store(key, node, rpc)
+                    ),
+                    args=[
+                        key,
+                        node,
+                        (action, DataType.Data, playlistData),
+                    ],
+                )
+                threads.append(thread)
+                thread.start()
 
-        for th in threads:
-            th.join()
+                for th in threads:
+                    th.join()
+                    nodes.pop()
+        return responses
 
     def store_a_file(self, file_direction: str, key_save: Optional[int] = None):
         key = sha1_hash(file_direction) if key_save is None else key_save
         nodes = self.node_lookup(key)
         resp = self.send_store_file(nodes, key, file_direction)
-        print("respuesta del store file: ", resp)
+        print("kademlia:lookup: respuesta del store file: ", resp)
+        return key_save
 
     def send_store_file(self, nodes, key, file_direction):
         threads = []
         time.sleep(0.5)
+        responses = []
         while len(nodes) > 0:
             for node in nodes[:alpha]:
-                print(f"sending a store to {node} on {key}")
+                print(f"kademlia:lookup: sending a store to {node} on {key}")
                 thread = threading.Thread(
-                    target=self.store,
+                    target=lambda key, node, rpc: responses.append(
+                        self.store(key, node, rpc)
+                    ),
                     args=[
                         key,
                         node,
@@ -136,14 +149,15 @@ class KademliaNode(KademliaRpcNode):
             for th in threads:
                 th.join()
                 nodes.pop()
+        return responses
 
     # get values
     def get_playlist(self, playlist_id: str):
-        print("buscando la playlist: ", playlist_id)
+        print("kademlia:lookup: buscando la playlist: ", playlist_id)
         key = sha1_hash(playlist_id)
         nodes = self.node_lookup(key)
         if len(nodes) == 0:
-            print("El valor buscano no esta en la red")
+            print("kademlia:lookup: El valor buscano no esta en la red")
             return None
         threads = []
         self.searched_data[key] = []
@@ -183,24 +197,24 @@ class KademliaNode(KademliaRpcNode):
         if value is not None:
             with lock:
                 self.searched_data[key].append(value)
-        print("encontrado: ", value)
+        print("kademlia:lookup: encontrado: ", value)
 
     def sincronize_peer_data(self, latest_value, data_type, original_key=None):
         if data_type is DataType.Data:
             self.store_playlist(StoreAction.UPDATE, latest_value)
         else:
-            print("archivo a actualizar: ", latest_value)
+            print("kademlia:lookup: archivo a actualizar: ", latest_value)
             self.store_a_file(latest_value, original_key)
 
     def get_a_file(self, key: int):
-        print("buscando la cancion: ", key)
+        print("kademlia:lookup: buscando la cancion: ", key)
         nodes = self.node_lookup(key)
         threads = []
         self.searched_data[key] = []
         while len(nodes) > 0:
             time.sleep(0.5)
             for node in nodes[:alpha]:
-                print(f"sending a find_value to {node} for {key}")
+                print(f"kademlia:lookup: sending a find_value to", node, " for ", key)
                 thread = threading.Thread(
                     target=self.wait_for_playlist,
                     args=[
@@ -218,7 +232,7 @@ class KademliaNode(KademliaRpcNode):
         del self.searched_data[key]
         returned_values.sort(key=lambda x: x[1], reverse=True)
         if len(returned_values) == 0:
-            print("valor no encontrado", key)
+            print("kademlia:lookup: valor no encontrado", key)
             return None
         ret_val, _ = returned_values[0]
         th = threading.Thread(
@@ -234,10 +248,18 @@ class KademliaNode(KademliaRpcNode):
 
     def refresh_buckets(self):
         while True:
+            my_knowed_nodes = {}
             for i, bucket in enumerate(self.routing_table.buckets):
                 for node in bucket.get_nodes():
-                    self.ping(node)
-            time.sleep(10)
+                    print("ping: ", node)
+                    if self.ping(node):
+                        if i not in my_knowed_nodes:
+                            my_knowed_nodes[i] = []
+                        my_knowed_nodes[i].append(node.__dict__)
+            json_str = json.dumps(my_knowed_nodes, indent=4)
+            with open("buckets.log", "w") as file:
+                file.write(json_str)
+            time.sleep(5)
 
     def start(self):
         self.network.start()
