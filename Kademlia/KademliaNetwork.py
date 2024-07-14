@@ -31,11 +31,11 @@ class KademliaNetwork:
         self.server_socket = socket.socket(
             socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP
         )
-        # ttl = struct.pack("b", 1)
-        # self.server_socket.setsockopt(
-        #     socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, ttl)
-        # self.server_socket.setsockopt(
-        #     socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+        ttl = struct.pack("b", 1)
+        self.server_socket.setsockopt(
+            socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, ttl)
+        self.server_socket.setsockopt(
+            socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
         self.server_socket.setsockopt(
             socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.server_socket.bind((node.ip, node.port))

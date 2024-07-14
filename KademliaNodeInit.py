@@ -35,5 +35,6 @@ def discover_network(node):
     node.ping(Node("224.1.1.1", node.port))
     # for adress in list(node.consensus.network_info.hosts())[:10]:
     #     print(node.ping(Node(str(adress), node.port)))
+    time.sleep(1)
     result = node.node_lookup(node.id)
     print("initializing: .... network discovered: ", result)
