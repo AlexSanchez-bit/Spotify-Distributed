@@ -54,10 +54,13 @@ class RoutingTable:
             if len(closest_nodes) >= count:
                 break
             if bucket_index - i >= 0:
-                closest_nodes.extend(self.buckets[bucket_index - i].get_nodes())
+                closest_nodes.extend(
+                    self.buckets[bucket_index - i].get_nodes())
             if bucket_index + i < ID_LENGTH:
-                closest_nodes.extend(self.buckets[bucket_index + i].get_nodes())
-        closest_nodes = sorted(closest_nodes, key=lambda node: node.id ^ target_id)
+                closest_nodes.extend(
+                    self.buckets[bucket_index + i].get_nodes())
+        closest_nodes = sorted(
+            closest_nodes, key=lambda node: node.id ^ target_id)
         return closest_nodes[:count]
 
     def get_node_count(self):
@@ -66,3 +69,10 @@ class RoutingTable:
             for _ in bucket.get_nodes():
                 count += 1
         return count
+
+    def get_all_nodes(self):
+        nodes = []
+        for bucket in self.buckets:
+            for node in bucket.get_nodes():
+                nodes.append(node)
+        return nodes

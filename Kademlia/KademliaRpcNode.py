@@ -1,4 +1,4 @@
-from Database.database_connectiom import PlaylistManager
+from Database.database_connectiom import Playlist, PlaylistManager
 from Kademlia.KBucket import K, Node
 from typing import Tuple, Any, List
 from Kademlia.RoutingTable import RoutingTable
@@ -270,6 +270,9 @@ class KademliaRpcNode(RpcNode):
                 try:
                     with lock:
                         self.database.make_action(action, data, clock_tick)
+                        if data is Playlist:
+                            self.consensus.send_entry_to_leader(
+                                (str(action), data.id))
                         self.network.send_rpc(
                             node,
                             Rpc(
