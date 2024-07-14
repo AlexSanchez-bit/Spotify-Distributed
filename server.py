@@ -43,13 +43,18 @@ def create_app():
 
     @app.route("/")
     def index():
-        my_knowed_nodes = {}
-        for i, bucket in enumerate(kademliaNode.routing_table.buckets):
-            for node in bucket.get_nodes():
-                if i not in my_knowed_nodes:
-                    my_knowed_nodes[i] = []
-                my_knowed_nodes[i].append(node.__dict__)
-        return f"Hello, World! from node {kademliaNode.id} look at my routing table {my_knowed_nodes}"
+        template = "<h4>My buckets</h4>"
+        for node in kademliaNode.routing_table.get_all_nodes():
+            template += f"<ul> "
+            template += f"<li>{node}</li>"
+            template += "</ul>"
+        template += f"<h2> Current state: {kademliaNode.consensus.state}</h2>"
+        template += f"<h3> My leader is {kademliaNode.consensus.leader}"
+        template += "<ol> logs"
+        for log in kademliaNode.consensus.logs:
+            template += f"<li>{log}</li>"
+        template += "</ol>"
+        return f"<h1>Hello, World! from node {kademliaNode.id}</h1>" + template
 
     def get_free_port():  # port sniffer
         import socket

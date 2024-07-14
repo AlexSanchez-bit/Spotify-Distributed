@@ -41,8 +41,7 @@ class RaftNode(Server):
     def start_threads(self):
         self.heartbeat_thread = threading.Thread(target=self.send_heartbeat)
         self.heartbeat_thread.start()
-        self.leader_wait_thread = threading.Thread(
-            target=self.wait_leader_heartbeat)
+        self.leader_wait_thread = threading.Thread(target=self.wait_leader_heartbeat)
         self.leader_wait_thread.start()
         self.apply_thread = threading.Thread(target=self.apply_log)
         self.apply_thread.start()
@@ -121,8 +120,7 @@ class RaftNode(Server):
         else:
             print("raft election rechazando votar a : ", address)
             self.network.send_rpc(
-                address, Rpc(RaftRpc.RequestVote,
-                             MessageType.Response, "NoVote")
+                address, Rpc(RaftRpc.RequestVote, MessageType.Response, "NoVote")
             )
 
     def process_vote_response(self, address: Node, payload: str):
@@ -134,7 +132,7 @@ class RaftNode(Server):
 
     def handle_leader_heartbeat(self, address: Node, payload: Tuple[int, List[str]]):
         peer_term, peer_log = payload
-        if peer_term >= self.current_term:
+        if peer_term > self.current_term:
             print(f"cambiando de lider de: {self.leader} to {address}")
             self.update_term(peer_term)
             with lock:
@@ -158,6 +156,10 @@ class RaftNode(Server):
         if message_type == MessageType.Request:
             response = self.append_entries(address, payload)
             self.network.send_rpc(address, response)
+            if self.state == RaftState.Leader:
+                self.send_broadcast_rpc(
+                    Rpc(RaftRpc.AppendEntries, MessageType.Request, payload)
+                )
         elif message_type == MessageType.Response:
             self.process_append_entries_response(address, payload)
 
@@ -165,27 +167,27 @@ class RaftNode(Server):
         self, address: Node, payload: Tuple[int, int, int, List[str], int]
     ):
         term, prev_log_index, prev_log_term, entries, leader_commit = payload
+        if term < self.current_term:
+            return Rpc(
+                RaftRpc.AppendEntries,
+                MessageType.Response,
+                (self.current_term, False),
+            )
         with lock:
-            if term < self.current_term:
-                return Rpc(
-                    RaftRpc.AppendEntries,
-                    MessageType.Response,
-                    (self.current_term, False),
-                )
             self.update_term(term)
-            if self.is_log_consistent(prev_log_index, prev_log_term):
-                self.update_log(entries, leader_commit)
-                return Rpc(
-                    RaftRpc.AppendEntries,
-                    MessageType.Response,
-                    (self.current_term, True),
-                )
-            else:
-                return Rpc(
-                    RaftRpc.AppendEntries,
-                    MessageType.Response,
-                    (self.current_term, False),
-                )
+        if self.is_log_consistent(prev_log_index, prev_log_term):
+            self.update_log(entries, leader_commit)
+            return Rpc(
+                RaftRpc.AppendEntries,
+                MessageType.Response,
+                (self.current_term, True),
+            )
+        else:
+            return Rpc(
+                RaftRpc.AppendEntries,
+                MessageType.Response,
+                (self.current_term, False),
+            )
 
     def send_entry_to_leader(self, entry: Tuple[str, str]):
         if self.state == RaftState.Follower and self.leader is not None:
@@ -208,14 +210,14 @@ class RaftNode(Server):
 
     def process_append_entries_response(self, address: Node, payload: Tuple[int, bool]):
         term, success = payload
-        with lock:
-            if term > self.current_term:
+        if term > self.current_term:
+            with lock:
                 self.update_term(term)
-                self.state = RaftState.Follower
-                self.leader = address
-            if success:
-                self.update_indices(address.id)
-                self.commit_entries()
+            self.state = RaftState.Follower
+            self.leader = address
+        if success:
+            self.update_indices(address.id)
+            self.commit_entries()
 
     def update_term(self, term: int):
         self.current_term = term
@@ -223,8 +225,7 @@ class RaftNode(Server):
 
     def is_log_consistent(self, prev_log_index: int, prev_log_term: int) -> bool:
         return prev_log_index < len(self.logs) and (
-            prev_log_index == -
-            1 or self.logs[prev_log_index][0] == prev_log_term
+            prev_log_index == -1 or self.logs[prev_log_index][0] == prev_log_term
         )
 
     def update_log(self, entries: List[str], leader_commit: int):
@@ -250,6 +251,7 @@ class RaftNode(Server):
         self.leader = self.node
         self.initialize_leader_state()
         print(f"raft: Node {self.node.id} elected as leader")
+        self.update_term(self.current_term + 1)
 
     def initialize_leader_state(self):
         for node in self.routing_table.get_all_nodes():
@@ -264,6 +266,6 @@ class RaftNode(Server):
                     self.last_applied += 1
                     print(
                         f"raft: Node {self.node.id}",
-                        f" applying log index {self.last_applied}",
+                        f"raft: applying log index {self.last_applied}",
                     )
             time.sleep(1)
