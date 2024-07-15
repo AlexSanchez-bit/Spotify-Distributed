@@ -172,8 +172,7 @@ class KademliaRpcNode(RpcNode):
             data_type, elid = data
             self.network.send_rpc(
                 node,
-                Rpc(RpcType.FindValue, MessageType.Request,
-                    (key, data_type, elid)),
+                Rpc(RpcType.FindValue, MessageType.Request, (key, data_type, elid)),
             )
             identifier = f"{key}{node.id}"
             self.values_requests[f"{key}{node.id}"] = None
@@ -270,17 +269,17 @@ class KademliaRpcNode(RpcNode):
                 try:
                     with lock:
                         self.database.make_action(action, data, clock_tick)
-                        if data is Playlist:
-                            self.consensus.send_entry_to_leader(
-                                (str(action), data.id))
-                        self.network.send_rpc(
-                            node,
-                                              Rpc(
-                                                  RpcType.Store,
-                                                  MessageType.Response,
-                                                  (key, (action, data_type, "OK")),
-                                              ),
-                                              )
+                    self.consensus.send_entry_to_leader(
+                        (str(action), (data.title, data.id))
+                    )
+                    self.network.send_rpc(
+                        node,
+                        Rpc(
+                            RpcType.Store,
+                            MessageType.Response,
+                            (key, (action, data_type, "OK")),
+                        ),
+                    )
                 except Exception as e:
                     print(
                         f"kademlia:rpc ocurrio un error al guardar la playlist", data.id
@@ -342,8 +341,7 @@ class KademliaRpcNode(RpcNode):
                 filetransfer.close_transmission()
         if message_type is MessageType.Response:
             if data_type is DataType.Data:
-                self.values_requests[f"{key}{address.id}"] = (
-                    data, clock_ticks)
+                self.values_requests[f"{key}{address.id}"] = (data, clock_ticks)
             else:
                 print(
                     "kademlia:rpc *********llego como respuesta del find_value: ",
