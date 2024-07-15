@@ -85,7 +85,7 @@ class RaftNode(Server):
                 Rpc(
                     RaftRpc.RequestVote,
                     MessageType.Request,
-                    (self.current_term, self.logs),
+                    (self.current_term, len(self.logs)),
                 )
             )
 
@@ -101,34 +101,34 @@ class RaftNode(Server):
     def handle_request_vote(
         self, address: Node, message_type: MessageType, payload: Any
     ):
-        if message_type == MessageType.Request:
-            peer_term, peer_log = payload
-            with lock:
+        with lock:
+            if message_type == MessageType.Request:
+                peer_term, peer_log = payload
                 self.process_vote_request(address, peer_term, peer_log)
-        elif message_type == MessageType.Response:
-            with lock:
+            elif message_type == MessageType.Response:
                 self.process_vote_response(address, payload)
 
-    def process_vote_request(self, address: Node, peer_term: int, peer_log: List[str]):
+    def process_vote_request(self, address: Node, peer_term: int, peer_log: int):
         if peer_term > self.current_term:
             self.update_term(peer_term)
+        if (self.voted_for is None or self.voted_for == address.id) and peer_log >= len(
+            self.logs
+        ):
             self.voted_for = address.id
-            print("raft election votando por: ", address)
             self.network.send_rpc(
                 address, Rpc(RaftRpc.RequestVote, MessageType.Response, "Vote")
             )
         else:
-            print("raft election rechazando votar a : ", address)
             self.network.send_rpc(
                 address, Rpc(RaftRpc.RequestVote, MessageType.Response, "NoVote")
             )
 
     def process_vote_response(self, address: Node, payload: str):
         if payload == "Vote":
-            print("raft: election recibido el voto de : ", address)
-            self.votes += 1
-            if self.votes > self.routing_table.get_node_count() / 2:
-                self.become_leader()
+            with lock:
+                self.votes += 1
+                if self.votes > self.routing_table.get_node_count() / 2:
+                    self.become_leader()
 
     def handle_leader_heartbeat(self, address: Node, payload: Tuple[int, List[str]]):
         peer_term, peer_log = payload
@@ -138,14 +138,14 @@ class RaftNode(Server):
             with lock:
                 self.leader = address
                 self.state = RaftState.Follower
-        self.network.send_rpc(
-            address,
-            Rpc(
-                RaftRpc.LeaderHeartBeat,
-                MessageType.Response,
-                (self.current_term, self.logs),
-            ),
-        )
+            self.network.send_rpc(
+                address,
+                Rpc(
+                    RaftRpc.LeaderHeartBeat,
+                    MessageType.Response,
+                    (self.current_term, self.logs),
+                ),
+            )
 
     def handle_append_entries(
         self,
@@ -187,25 +187,6 @@ class RaftNode(Server):
                 RaftRpc.AppendEntries,
                 MessageType.Response,
                 (self.current_term, False),
-            )
-
-    def send_entry_to_leader(self, entry: Tuple[str, str]):
-        if self.state == RaftState.Follower and self.leader is not None:
-            # Enviar la entrada al líder
-            print("enviando log al lider")
-            self.network.send_rpc(
-                self.leader,
-                Rpc(
-                    RaftRpc.AppendEntries,
-                    MessageType.Request,
-                    (
-                        self.current_term,
-                        len(self.logs) - 1,
-                        self.logs[-1] if self.logs else -1,
-                        [entry],
-                        self.commit_index,
-                    ),
-                ),
             )
 
     def process_append_entries_response(self, address: Node, payload: Tuple[int, bool]):
