@@ -1,2 +1,3 @@
-# Spotify-Distributed
-A Distributed system project for my computer science degree on University of Havana
+
+Alex Sánchez Saez C-412
+Carlos Manuel Gonzáles Peña C-411
