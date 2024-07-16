@@ -16,6 +16,13 @@ class RoutingTable:
             KBucket(2**i, 2 ** (i + 1)) for i in range(ID_LENGTH)
         ]
 
+    def get_node_by_id(self, node_id):
+        index = self.get_bucket_index(node_id)
+        for node in self.buckets[index].get_nodes():
+            if node.id == node_id:
+                return node
+        return None
+
     def add_node(self, node: Node):
         """
         this adds a node to the k-buckets
@@ -54,13 +61,10 @@ class RoutingTable:
             if len(closest_nodes) >= count:
                 break
             if bucket_index - i >= 0:
-                closest_nodes.extend(
-                    self.buckets[bucket_index - i].get_nodes())
+                closest_nodes.extend(self.buckets[bucket_index - i].get_nodes())
             if bucket_index + i < ID_LENGTH:
-                closest_nodes.extend(
-                    self.buckets[bucket_index + i].get_nodes())
-        closest_nodes = sorted(
-            closest_nodes, key=lambda node: node.id ^ target_id)
+                closest_nodes.extend(self.buckets[bucket_index + i].get_nodes())
+        closest_nodes = sorted(closest_nodes, key=lambda node: node.id ^ target_id)
         return closest_nodes[:count]
 
     def get_node_count(self):

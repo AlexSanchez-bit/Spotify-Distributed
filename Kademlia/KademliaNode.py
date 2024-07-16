@@ -23,7 +23,6 @@ class KademliaNode(KademliaRpcNode):
     def __init__(self, ip: str, port: int):
         super().__init__(ip, port)
         self.searched_data = {}
-        self.leader_node = None
 
     # Find Nodes on the network
 
@@ -186,10 +185,11 @@ class KademliaNode(KademliaRpcNode):
         del self.searched_data[key]
         returned_values.sort(key=lambda x: x[1], reverse=True)
         ret_val, _ = returned_values[0]
-        th = threading.Thread(
-            target=self.sincronize_peer_data, args=[ret_val, DataType.Data]
-        )  # sincronize the highest clock in all k nearest nodes
-        th.start()
+        if ret_val is not None:
+            th = threading.Thread(
+                target=self.sincronize_peer_data, args=[ret_val, DataType.Data]
+            )  # sincronize the highest clock in all k nearest nodes
+            th.start()
         return ret_val
 
     def wait_for_playlist(self, key: int, node: Node, data: Tuple[DataType, str]):
@@ -245,6 +245,38 @@ class KademliaNode(KademliaRpcNode):
                 os.remove(resp_file)
 
         return ret_val
+
+    def get_all(self):
+        all_list = set(map(lambda x: (x.id, x.title), self.database.playlists))
+        short_list = self.routing_table.get_all_nodes()
+        already_seen = set([])
+        while len(short_list) > 0:
+            threeads = []
+            for node in short_list[:alpha]:
+                already_seen.add(node.id)
+                th = threading.Thread(
+                    target=self.find_all_values, args=[node, all_list, short_list]
+                )
+                short_list.remove(node)
+                threeads.append(th)
+                th.start()
+            for th in threeads:
+                th.join()
+            if all([node.id in already_seen for node in short_list]):
+                break
+        return list(all_list)
+
+    def find_all_values(self, node: Node, all_list, nodes_list):
+        values = self.find_value(-1, node, (DataType.Data, "get all"))
+        self.find_node(-1, node)
+        if values is not None:
+            values = values[0]
+            for value in values:
+                all_list.add(value)
+        nodes = self._wait_for_response(-1)
+        if nodes is not None:
+            for node in nodes:
+                nodes_list.append(node)
 
     def refresh_buckets(self):
         while True:

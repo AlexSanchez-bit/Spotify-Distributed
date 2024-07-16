@@ -14,7 +14,7 @@ import threading
 from Kademlia.utils.StoreAction import StoreAction
 import time
 
-from RaftConsensus.RaftNode import RaftNode
+from RaftConsensus.RaftNode import BullyConsensus
 
 lock = threading.Lock()
 
@@ -32,7 +32,7 @@ class KademliaRpcNode(RpcNode):
         self.values_requests = {}
         self.pings = {}
 
-        self.consensus = RaftNode(
+        self.consensus = BullyConsensus(
             Node(self.ip, self.port, self.id), self.network, self.routing_table
         )
 
@@ -207,8 +207,9 @@ class KademliaRpcNode(RpcNode):
                 key, address, data_type, message_type, data, clock_ticks
             )
             return
-        else:
-            self.consensus.handle_raft_rpc(address, rpc, clock_ticks)
+        # else:
+        #     self.consensus.handle_rpc(address, rpc, clock_ticks)
+        #     return
 
     def handle_ping(self, node, message_type):
         if message_type == MessageType.Request:
@@ -226,6 +227,12 @@ class KademliaRpcNode(RpcNode):
     def handle_find_node(self, message_type, node, payload):
         if message_type == MessageType.Request:
             node, target_id = payload
+            if target_id == -1:
+                self.find_node_response(
+                    target_id, self.routing_table.get_all_nodes(), node
+                )
+                return
+
             result = self.routing_table.find_closest_nodes(target_id, K)
             print("kademlia:rpc results: ", result)
             result.sort(key=lambda node: node.id ^ target_id)
@@ -269,9 +276,7 @@ class KademliaRpcNode(RpcNode):
                 try:
                     with lock:
                         self.database.make_action(action, data, clock_tick)
-                    self.consensus.send_entry_to_leader(
-                        (str(action), (data.title, data.id))
-                    )
+                    # self.consensus.log.append((action, (data.id, data.name)))
                     self.network.send_rpc(
                         node,
                         Rpc(
@@ -318,6 +323,16 @@ class KademliaRpcNode(RpcNode):
     ):
         if message_type is MessageType.Request:
             if data_type is DataType.Data:
+                if key == -1:
+                    self.network.send_rpc(
+                        address,
+                        Rpc(
+                            RpcType.FindValue,
+                            MessageType.Response,
+                            (key, DataType.Data, self.database.get_all()),
+                        ),
+                    )
+                    return
                 self.network.send_rpc(
                     address,
                     Rpc(

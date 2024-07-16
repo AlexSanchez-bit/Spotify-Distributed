@@ -26,15 +26,13 @@ def init_node():
 
 def discover_network(node):
     print("initializing: ....starting network discovery")
-    print(
-        "initializing: broadcast address",
-        node.consensus.broadcast_address
-    )
-    node.ping(Node(
-        node.consensus.broadcast_address, node.port))
+    print("initializing: broadcast address", node.consensus.broadcast_address)
+    node.ping(Node(node.consensus.broadcast_address, node.port))
+    node.consensus.send_broadcast_rpc(Rpc(RpcType.Ping, MessageType.Request, "Ping"))
     node.ping(Node("224.1.1.1", node.port))
     # for adress in list(node.consensus.network_info.hosts())[:10]:
     #     print(node.ping(Node(str(adress), node.port)))
     time.sleep(1)
     result = node.node_lookup(node.id)
+    node.consensus.start_election()
     print("initializing: .... network discovered: ", result)

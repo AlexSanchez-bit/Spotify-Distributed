@@ -20,9 +20,7 @@ UPLOAD_FOLDER = "uploads"
 
 def upload_song(data):
     songs = []
-    print("data ", data)
     for song in data["songs"]:
-        print(song)
         key = int(song["id"])
         kademliaNode.store_a_file(f"{UPLOAD_FOLDER}/{key}", key)
         new_song = Song(song["name"], song["author"], key)
@@ -48,12 +46,8 @@ def create_app():
             template += f"<ul> "
             template += f"<li>{node}</li>"
             template += "</ul>"
-        template += f"<h2> Current state: {kademliaNode.consensus.state}</h2>"
-        template += f"<h3> My leader is {kademliaNode.consensus.leader}"
-        template += "<ol> logs"
-        for log in kademliaNode.consensus.logs:
-            template += f"<li>{log}</li>"
-        template += "</ol>"
+        template += f"<h2> Current state: {kademliaNode.consensus.state}"
+        template += f" {kademliaNode.consensus.leader_id}</h2>"
         return f"<h1>Hello, World! from node {kademliaNode.id}</h1>" + template
 
     def get_free_port():  # port sniffer
@@ -65,61 +59,82 @@ def create_app():
         s.close()
         return port
 
-    @app.route("/get-playlist/:id", methods=["GET"])
+    @app.route("/get-all-playlists", methods=["POST"])
+    def get_all_playlists():
+        data = request.json
+        result = kademliaNode.get_all()
+        to_index = data.get("to", len(result) - 1)
+        from_index = data.get("from", 0)
+        if result is None:
+            return jsonify({"message": "No playlists found"}), 404
+        return jsonify(
+            {"items": result[from_index:to_index], "count": len(result)}
+        ), 200
+
+    @app.route("/get-playlist/<id>", methods=["GET"])
     def get_playlist(id):
         result = kademliaNode.get_playlist(id)
         if result is None:
-            return "Playlist No Encontrada"
-        print("encontrada: ", result)
-        return result.to_dict()
+            return jsonify({"message": "Playlist not found"}), 404
+        return jsonify(result.to_dict()), 200
 
     @app.route("/add-playlist", methods=["POST"])
-    def set_playlist():
+    def add_playlist():
         data = request.json
-        new_playlist = Playlist(data["title"], data["author"], f"{time.time()}")
+        new_playlist = Playlist(
+            data["title"], data["author"], f"{time.time()}")
         songs = upload_song(data)
         new_playlist.songs = songs
-        print("adding playlist", new_playlist)
         kademliaNode.store_playlist(StoreAction.INSERT, new_playlist)
-        return new_playlist.to_dict()
+        return jsonify(new_playlist.to_dict()), 201
+
+    @app.route("/update-playlist/<id>", methods=["PUT"])
+    def update_playlist(id):
+        data = request.json
+        existing_playlist = kademliaNode.get_playlist(id)
+        if existing_playlist is None:
+            return jsonify({"message": "Playlist not found"}), 404
+        existing_playlist.title = data.get("title", existing_playlist.title)
+        existing_playlist.author = data.get("author", existing_playlist.author)
+        songs = upload_song(data)
+        existing_playlist.songs = songs
+        kademliaNode.store_playlist(StoreAction.UPDATE, existing_playlist)
+        return jsonify(existing_playlist.to_dict()), 200
+
+    @app.route("/delete-playlist/<id>", methods=["DELETE"])
+    def delete_playlist(id):
+        existing_playlist = kademliaNode.get_playlist(id)
+        if existing_playlist is None:
+            return jsonify({"message": "Playlist not found"}), 404
+        kademliaNode.store_playlist(StoreAction.DELETE, existing_playlist)
+        return jsonify({"message": "Playlist deleted"}), 200
 
     @app.route("/upload-file", methods=["POST"])
     def upload_file():
         if "file" not in request.files:
-            return "No file part"
+            return "No file part", 400
         file = request.files["file"]
         if file.filename == "":
-            return "No selected file"
+            return "No selected file", 400
         if file:
             filename = str(sha1_hash(file.filename))
             file.save(os.path.join(app.config["UPLOAD_FOLDER"], f"{filename}"))
-            return f"{filename}"
+            return jsonify({"filename": filename}), 201
 
     @app.route("/get-song/<int:id>")
     def get_song(id):
         global socketio
         global sockets_ports
-        print("obteniendo socket")
-        # Obtener el puerto libre para el socket
-        print("obteniendo puerto")
         port = get_free_port()
-        print("puerto", port, "libre")
-        # Iniciar el socket en el puerto obtenido
         thread = threading.Thread(target=set_socket, args=(id, port))
         thread.start()
-        print("devolviendo puerto")
-        # Devolver el puerto como respuesta
         return jsonify({"port": port})
 
     def play_song(socketio, instant, id):
-        print("leyendo cancion")
         kademliaNode.get_a_file(id)
         audio_file = AudioSegment.from_file(f"songs/{id}.mp3")
-        print("Canción convertida a WAV")
         wav_audio = audio_file.export(format="wav")
         wav_audio_segment = AudioSegment.from_wav(io.BytesIO(wav_audio.read()))
-
-        print("cancion leida")
         chunk_size = 1000  # Tamaño del fragmento en bytes
 
         socketio.emit("song_info", {"size": len(wav_audio_segment) // 1000})
@@ -127,25 +142,19 @@ def create_app():
         @socketio.on("next_package")
         def send_packages(next_instant):
             for i in range(next_instant * 1000, len(wav_audio_segment), chunk_size)[:3]:
-                # Obtener el chunk de audio en formato WAV
-                chunk_audio = wav_audio_segment[i : i + chunk_size]
-
-                # Convertir el chunk a bytes
+                chunk_audio = wav_audio_segment[i: i + chunk_size]
                 chunk_bytes = io.BytesIO()
                 chunk_audio.export(chunk_bytes, format="wav")
-                # Enviar el chunk al cliente
-                print(i // chunk_size)
                 socketio.emit(
                     "audio_chunk",
                     {"index": i // chunk_size, "data": chunk_bytes.getvalue()},
                 )
 
         send_packages(instant)
-        # Notificar al cliente cuando se ha enviado todo el archivo
 
     def set_socket(id, port):
-        socketio = SocketIO(app, resources={r"/*": {"origins": "*"}}, port=port)
-        # Registrar el puerto asociado al id de la canción
+        socketio = SocketIO(
+            app, resources={r"/*": {"origins": "*"}}, port=port)
         sockets_ports[id] = port
 
         @socketio.on("connect")
@@ -166,8 +175,8 @@ def create_app():
             socketio.stop()
             return "Socket cerrado", 200
 
-        print("instanciando el socket")
-        socketio.run(app, port=port, debug=True, use_reloader=False, log_output=False)
+        socketio.run(app, port=port, debug=True,
+                     use_reloader=False, log_output=False)
 
     app.run(host=kademliaNode.ip, port=54321)
 
