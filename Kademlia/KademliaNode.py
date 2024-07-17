@@ -116,7 +116,8 @@ class KademliaNode(KademliaRpcNode):
 
                 for th in threads:
                     th.join()
-                    nodes.pop()
+                    if len(nodes) > 0:
+                        nodes.pop()
         return responses
 
     def store_a_file(self, file_direction: str, key_save: Optional[int] = None):
@@ -147,7 +148,8 @@ class KademliaNode(KademliaRpcNode):
                 thread.start()
             for th in threads:
                 th.join()
-                nodes.pop()
+                if len(nodes) > 0:
+                    nodes.pop()
         return responses
 
     # get values
