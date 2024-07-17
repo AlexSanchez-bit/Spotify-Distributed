@@ -81,31 +81,25 @@ def create_app():
     @app.route("/add-playlist", methods=["POST"])
     def add_playlist():
         data = request.json
-        new_playlist = Playlist(
-            data["title"], data["author"], f"{time.time()}")
+        new_playlist = Playlist(data["title"], data["author"], f"{time.time()}")
         songs = upload_song(data)
         new_playlist.songs = songs
         kademliaNode.store_playlist(StoreAction.INSERT, new_playlist)
         return jsonify(new_playlist.to_dict()), 201
 
-    @app.route("/update-playlist/<id>", methods=["PUT"])
-    def update_playlist(id):
+    @app.route("/update-playlist", methods=["PUT"])
+    def update_playlist():
         data = request.json
-        existing_playlist = kademliaNode.get_playlist(id)
-        if existing_playlist is None:
-            return jsonify({"message": "Playlist not found"}), 404
-        existing_playlist.title = data.get("title", existing_playlist.title)
-        existing_playlist.author = data.get("author", existing_playlist.author)
+        print(data)
+        playlist = Playlist(data["title"], data["author"], data["id"])
         songs = upload_song(data)
-        existing_playlist.songs = songs
-        kademliaNode.store_playlist(StoreAction.UPDATE, existing_playlist)
-        return jsonify(existing_playlist.to_dict()), 200
+        playlist.songs = songs
+        kademliaNode.store_playlist(StoreAction.UPDATE, playlist)
+        return jsonify(playlist.to_dict()), 200
 
     @app.route("/delete-playlist/<id>", methods=["DELETE"])
     def delete_playlist(id):
-        existing_playlist = kademliaNode.get_playlist(id)
-        if existing_playlist is None:
-            return jsonify({"message": "Playlist not found"}), 404
+        existing_playlist = Playlist("", "", id)
         kademliaNode.store_playlist(StoreAction.DELETE, existing_playlist)
         return jsonify({"message": "Playlist deleted"}), 200
 
@@ -142,7 +136,7 @@ def create_app():
         @socketio.on("next_package")
         def send_packages(next_instant):
             for i in range(next_instant * 1000, len(wav_audio_segment), chunk_size)[:3]:
-                chunk_audio = wav_audio_segment[i: i + chunk_size]
+                chunk_audio = wav_audio_segment[i : i + chunk_size]
                 chunk_bytes = io.BytesIO()
                 chunk_audio.export(chunk_bytes, format="wav")
                 socketio.emit(
@@ -153,8 +147,7 @@ def create_app():
         send_packages(instant)
 
     def set_socket(id, port):
-        socketio = SocketIO(
-            app, resources={r"/*": {"origins": "*"}}, port=port)
+        socketio = SocketIO(app, resources={r"/*": {"origins": "*"}}, port=port)
         sockets_ports[id] = port
 
         @socketio.on("connect")
@@ -175,8 +168,7 @@ def create_app():
             socketio.stop()
             return "Socket cerrado", 200
 
-        socketio.run(app, port=port, debug=True,
-                     use_reloader=False, log_output=False)
+        socketio.run(app, port=port, debug=True, use_reloader=False, log_output=False)
 
     app.run(host=kademliaNode.ip, port=54321)
 
