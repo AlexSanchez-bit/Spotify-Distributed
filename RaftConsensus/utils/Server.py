@@ -40,7 +40,7 @@ class Server:
     def calculate_broadcast_address(self):
         netmask = "255.255.255.0"
         gateway = ni.gateways()["default"][ni.AF_INET][0]
-        network = ipaddress.IPv4Network(f"{'172.19.0.255'}/{netmask}", strict=False)
+        network = ipaddress.IPv4Network(f"{gateway}/{netmask}", strict=False)
         self.network_info = network
         self.netmask = netmask
         self.broadcast_address = str(network.broadcast_address)

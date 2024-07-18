@@ -10,8 +10,6 @@ services:
     ports:
       - "8081:54321"
       - "8091:19009/udp"
-    volumes:
-      - .:/app
 
   node2:
     build:
@@ -24,8 +22,6 @@ services:
     ports:
       - "8082:54321"
       - "8092:19009/udp"
-    volumes:
-      - .:/app
 
   node3:
     build:
@@ -38,8 +34,6 @@ services:
     ports:
       - "8083:54321"
       - "8093:19009/udp"
-    volumes:
-      - .:/app
   node4:
     build:
       context: .
@@ -52,8 +46,6 @@ services:
       - "8084:54321"
       - "8094:19009/udp"
     restart: no
-    volumes:
-      - .:/app
 networks:
   kademlia-network-broadcast:
     driver: bridge

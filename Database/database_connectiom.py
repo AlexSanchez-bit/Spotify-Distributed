@@ -44,8 +44,7 @@ class Playlist:
     @classmethod
     def from_dict(cls, data):
         playlist = cls(data["title"], data["author"], data["id"])
-        playlist.songs = [Song.from_dict(song_data)
-                          for song_data in data["songs"]]
+        playlist.songs = [Song.from_dict(song_data) for song_data in data["songs"]]
         return playlist
 
     def __str__(self):
@@ -80,6 +79,7 @@ class PlaylistManager:
             ]
         elif action == StoreAction.DELETE:
             self.playlists.remove(playlist_data)
+
         self.save_snapshop()
 
     def add_playlist(self, playlist: Playlist):
