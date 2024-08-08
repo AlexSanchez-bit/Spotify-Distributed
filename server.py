@@ -170,9 +170,16 @@ def create_app():
             socketio.stop()
             return "Socket cerrado", 200
 
-        socketio.run(app, port=port, debug=True, use_reloader=False, log_output=False)
+        socketio.run(
+            app,
+            port=port,
+            debug=True,
+            use_reloader=False,
+            log_output=False,
+            allow_unsafe_werkzeug=True,
+        )
 
-    app.run(host=kademliaNode.ip, port=54321, allow_unsafe_werkzeug=True)
+    app.run(host=kademliaNode.ip, port=54321)
 
 
 create_app()

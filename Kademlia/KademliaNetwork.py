@@ -61,21 +61,34 @@ class KademliaNetwork:
         """
         while True:
             message, address = self.server_socket.recvfrom(4096)
-            ip, port = address
-            sender = Node(ip, port)
-            rpc, ticks = pickle.loads(message)
-            self.clock.tick()
-            self.clock.merge_ticks(ticks)
+            self.handle_rpc(message, address)
+            time.sleep(0.5)
 
-            respond_thread = threading.Thread(
-                target=self.node.handle_rpc, args=[sender, rpc, self.clock.ticks]
-            )
-            respond_thread.start()
+    def handle_rpc(self, message, address):
+        try:
+            print("received: ---", message.decode())
+            if message.decode() == "client":  # received client broadcast
+                self.server_socket.sendto(
+                    "server".encode(), address
+                )  # respond to client
+                return
+        except Exception:
+            print("no client petition")
 
-            refresh_thread = threading.Thread(
-                target=self.refresh_k_buckets, args=[sender]
-            )
-            refresh_thread.start()
+        ip, port = address
+        sender = Node(ip, port)
+        rpc, ticks = pickle.loads(message)
+        self.clock.tick()
+        self.clock.merge_ticks(ticks)
+
+        respond_thread = threading.Thread(
+            target=self.node.handle_rpc, args=[sender, rpc, self.clock.ticks]
+        )
+        respond_thread.start()
+
+        refresh_thread = threading.Thread(
+            target=self.refresh_k_buckets, args=[sender])
+        refresh_thread.start()
 
     def refresh_k_buckets(self, node: Node):
         least = self.node.routing_table.add_node(node)

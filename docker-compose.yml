@@ -4,48 +4,76 @@ services:
       context: .
       dockerfile: Dockerfile
     networks:
-      - kademlia-network-broadcast
+      - kademlia-network
     cap_add:
       - NET_BROADCAST
     ports:
       - "8081:54321"
       - "8091:19009/udp"
+    restart: no
+    volumes:
+      - .:/app
 
   node2:
     build:
       context: .
       dockerfile: Dockerfile
     networks:
-      - kademlia-network-broadcast
+      - kademlia-network
     cap_add:
       - NET_BROADCAST
     ports:
       - "8082:54321"
       - "8092:19009/udp"
+    restart: no
+    volumes:
+      - .:/app
 
   node3:
     build:
       context: .
       dockerfile: Dockerfile
     networks:
-      - kademlia-network-broadcast
+      - kademlia-network
     cap_add:
       - NET_BROADCAST
     ports:
       - "8083:54321"
       - "8093:19009/udp"
+    restart: no
+    volumes:
+      - .:/app
   node4:
     build:
       context: .
       dockerfile: Dockerfile
     networks:
-      - kademlia-network-broadcast
+      - kademlia-network
     cap_add:
       - NET_BROADCAST
     ports:
       - "8084:54321"
       - "8094:19009/udp"
     restart: no
+    volumes:
+      - .:/app
+
+  ui:
+    image: distribuido_ui
+    networks:
+      - kademlia-network
+    cap_add:
+      - NET_BROADCAST
+    ports:
+      - "8080:54321"
+    depends_on:
+      - node1
+      - node2
+      - node3
+      - node4
+    restart: no
+    volumes:
+      - ../distribuido_spotify_ui/:/app
 networks:
-  kademlia-network-broadcast:
-    driver: bridge
+  kademlia-network:
+    external: true
