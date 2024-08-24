@@ -57,6 +57,62 @@ services:
     restart: no
     volumes:
       - .:/app
+  node5:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    networks:
+      - kademlia-network
+    cap_add:
+      - NET_BROADCAST
+    ports:
+      - "8085:54321"
+      - "8095:19009/udp"
+    restart: no
+    volumes:
+      - .:/app
+  node6:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    networks:
+      - kademlia-network
+    cap_add:
+      - NET_BROADCAST
+    ports:
+      - "8086:54321"
+      - "8096:19009/udp"
+    restart: no
+    volumes:
+      - .:/app
+  node7:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    networks:
+      - kademlia-network
+    cap_add:
+      - NET_BROADCAST
+    ports:
+      - "8087:54321"
+      - "8097:19009/udp"
+    restart: no
+    volumes:
+      - .:/app
+  node8:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    networks:
+      - kademlia-network
+    cap_add:
+      - NET_BROADCAST
+    ports:
+      - "8088:54321"
+      - "8098:19009/udp"
+    restart: no
+    volumes:
+      - .:/app
 
   ui:
     image: distribuido_ui

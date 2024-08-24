@@ -1,3 +1,4 @@
+from enum import Enum
 import json
 import threading
 import time
@@ -7,27 +8,43 @@ from Kademlia.utils.StoreAction import StoreAction
 lock = threading.Lock()
 
 
+class Gender(Enum):
+    Rock = "Rock"
+    Jazz = "Jazz"
+    Romance = "Romance"
+    Balad = "Balad"
+    Pop = "Pop"
+    Metal = "Metal"
+
+
 class Song:
-    def __init__(self, name, author, key):
+    def __init__(self, name, author, key, gender: Gender):
         self.name = name
         self.author = author
         self.key = key
+        self.gender = gender
 
     def to_dict(self):
-        return {"name": self.name, "author": self.author, "key": self.key}
+        return {
+            "name": self.name,
+            "author": self.author,
+            "key": self.key,
+            "gender": self.gender,
+        }
 
     @classmethod
     def from_dict(cls, data):
-        song = cls(data["name"], data["author"], data["key"])
+        song = cls(data["name"], data["author"], data["key"], data["gender"])
         song.key = data["key"]
         return song
 
 
 class Playlist:
-    def __init__(self, title, author, id):
+    def __init__(self, title, author, id, gender: Gender, songs=[]):
         self.title = title
         self.author = author
-        self.songs = []
+        self.songs = songs
+        self.gender = gender
         self.id = id
 
     def to_dict(self):
@@ -35,6 +52,7 @@ class Playlist:
             "title": self.title,
             "author": self.author,
             "songs": [song.to_dict() for song in self.songs],
+            "gender": self.gender,
             "id": self.id,
         }
 
@@ -43,7 +61,7 @@ class Playlist:
 
     @classmethod
     def from_dict(cls, data):
-        playlist = cls(data["title"], data["author"], data["id"])
+        playlist = cls(data["title"], data["author"], data["id"], data["gender"])
         playlist.songs = [Song.from_dict(song_data) for song_data in data["songs"]]
         return playlist
 
@@ -53,42 +71,89 @@ class Playlist:
 
 class PlaylistManager:
     def __init__(self):
-        saved = self.load_from_json("data/store.json")
+        saved = self.load_from_json("/tmp/data/store.json")
         self.playlists = saved.playlists if saved is not None else []
         self.actions_registered = []
 
-    def get_all(self):
-        return list(map(lambda x: (x.id, x.title), self.playlists))
+    def get_all(self, filter):
+        print("filtering", filter)
+        if filter is not None:
+            filtered_playlists = []
+            for playlist in self.playlists:
+                match = True
+                if (
+                    filter.get("title") not in [None, ""]
+                    and filter["title"].lower() not in playlist.title.lower()
+                ):
+                    match = False
+                if (
+                    filter.get("author") not in [None, ""]
+                    and filter["author"].lower() not in playlist.author.lower()
+                ):
+                    match = False
+                if (
+                    filter.get("gender") not in [None, ""]
+                    and filter["gender"] != playlist.gender
+                ):
+                    match = False
+
+                if match:
+                    filtered_playlists.append(
+                        (playlist.id, playlist.title, playlist.author)
+                    )
+            return filtered_playlists
+        else:
+            with lock:
+                return list(map(lambda x: (x.id, x.title, x.author), self.playlists))
 
     def get_by_id(self, id):
-        return next((item for item in self.playlists if item.id == id), None)
+        playlist = None
+        with lock:
+            for play in self.playlists:
+                if play.id == id:
+                    playlist = play
+                    break
+        print(
+            f"database:find{id}:result",
+            f"{playlist.to_dict() if playlist is not None else None}",
+        )
+        with lock:
+            return playlist.to_dict() if playlist is not None else None
 
     def make_action(self, action: StoreAction, playlist_data: Playlist, order: int):
         with lock:
             self.actions_registered.append((action, playlist_data, order))
             self.actions_registered.sort(key=lambda x: x[2])
-            time.sleep(0.1)
 
         action, playlist_data, _ = self.actions_registered.pop()
-        if action == StoreAction.INSERT:
-            self.add_playlist(playlist_data)
-        elif action == StoreAction.UPDATE:
-            self.playlists = [
-                playlist_data if item.id == playlist_data.id else item
-                for item in self.playlists
-            ]
-        elif action == StoreAction.DELETE:
-            self.playlists.remove(playlist_data)
+        with lock:
+            if action == StoreAction.INSERT:
+                self.add_playlist(playlist_data)
+            elif action == StoreAction.UPDATE:
+                if playlist_data not in self.playlists:
+                    self.playlists.append(playlist_data)
+                else:
+                    self.playlists = [
+                        playlist_data if item.id == playlist_data.id else item
+                        for item in self.playlists
+                    ]
+            elif action == StoreAction.DELETE:
+                print(f"before remove: {self.playlists}")
+                self.playlists.remove(playlist_data)
+                print(f"after remove: {self.playlists}")
 
-        self.save_snapshop()
+        with lock:
+            self.save_snapshop()
+            saved = self.load_from_json("/tmp/data/store.json")
+            self.playlists = saved.playlists if saved is not None else []
 
     def add_playlist(self, playlist: Playlist):
         self.playlists.append(playlist)
 
     def save_snapshop(self):
-        self.save_to_json("data/store.json")
+        self.save_to_json("/tmp/data/store.json")
 
-    def to_dict(self):
+    def to_dafter(self):
         return [playlist.to_dict() for playlist in self.playlists]
 
     @classmethod
@@ -102,7 +167,7 @@ class PlaylistManager:
     # Métodos para guardar y cargar en JSON
     def save_to_json(self, filename):
         with open(filename, "w") as f:
-            json.dump(self.to_dict(), f, indent=2)
+            json.dump(self.to_dafter(), f, indent=2)
 
     @classmethod
     def load_from_json(cls, filename):

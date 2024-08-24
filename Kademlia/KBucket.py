@@ -4,7 +4,7 @@ from typing import List
 
 lock = Lock()
 
-K = 20  # Número de nodos en cada k-bucket
+K = 3  # Número de nodos en cada k-bucket
 ID_LENGTH = 160  # Longitud de los identificadores en bits
 
 

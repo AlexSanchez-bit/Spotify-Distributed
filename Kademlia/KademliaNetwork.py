@@ -32,17 +32,12 @@ class KademliaNetwork:
             socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP
         )
         ttl = struct.pack("b", 1)
-        self.server_socket.setsockopt(
-            socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, ttl)
-        self.server_socket.setsockopt(
-            socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-        self.server_socket.setsockopt(
-            socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self.server_socket.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, ttl)
+        self.server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+        self.server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.server_socket.bind((node.ip, node.port))
-        mreq = struct.pack("4sl", socket.inet_aton(
-            "224.1.1.1"), socket.INADDR_ANY)
-        self.server_socket.setsockopt(
-            socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
+        mreq = struct.pack("4sl", socket.inet_aton("224.1.1.1"), socket.INADDR_ANY)
+        self.server_socket.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
         self.sended_pings = []
         print(f"node {node.id} listenning on {node.ip}:{node.port}")
 
@@ -62,7 +57,7 @@ class KademliaNetwork:
         while True:
             message, address = self.server_socket.recvfrom(4096)
             self.handle_rpc(message, address)
-            time.sleep(0.5)
+            time.sleep(0.00000005)
 
     def handle_rpc(self, message, address):
         try:
@@ -86,8 +81,7 @@ class KademliaNetwork:
         )
         respond_thread.start()
 
-        refresh_thread = threading.Thread(
-            target=self.refresh_k_buckets, args=[sender])
+        refresh_thread = threading.Thread(target=self.refresh_k_buckets, args=[sender])
         refresh_thread.start()
 
     def refresh_k_buckets(self, node: Node):
@@ -95,10 +89,11 @@ class KademliaNetwork:
         if least is not None:
             result = self.node.ping(least, MessageType.Request)
             index = self.node.routing_table.get_bucket_index(least.id)
-            self.node.routing_table.buckets[index].remove_node(least)
             if not result:
+                self.node.routing_table.buckets[index].remove_node(least)
                 self.node.routing_table.add_node(node)
             else:
+                self.node.routing_table.buckets[index].remove_node(least)
                 self.node.routing_table.add_node(least)
 
     def start(self):
