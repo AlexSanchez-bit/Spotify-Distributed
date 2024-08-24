@@ -153,7 +153,7 @@ class KademliaRpcNode(RpcNode):
                     (key, DataType.File, direction),
                 ),
             )
-            # filetransfer.receive_file(f"/tmp/songs/{node.id}{key}.mp3")
+            filetransfer.receive_file(f"/tmp/songs/{node.id}{key}.mp3")
             while time.time() - start_time < timeout:
                 time.sleep(0.005)
                 with lock:
