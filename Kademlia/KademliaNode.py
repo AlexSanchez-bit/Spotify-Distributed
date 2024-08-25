@@ -11,6 +11,7 @@ import time
 
 import threading
 
+from Kademlia.utils.DataTransfer.FileTransfer import FileTransfer
 from Kademlia.utils.DataType import DataType
 from Kademlia.utils.StoreAction import StoreAction
 
@@ -31,17 +32,21 @@ class KademliaNode(KademliaRpcNode):
         already_queried = set()
         closest_nodes = []
 
-        while shortlist:
+        while len(shortlist) > 0:
             print("kademlia:lookup: short list", shortlist)
             # Sort shortlist by distance to target_id
-
+            shortlist.sort(key=lambda node: node.id ^ target_id)
+            tmp_order = shortlist + closest_nodes
+            tmp_order.sort(key=lambda node: node.id ^ target_id)
+            closest_nodes = list(set(tmp_order))[:K]
             # Parallel RPCs to alpha nodes
             threads = []
-            for node in closest_nodes[:alpha]:
+            for node in shortlist[:alpha]:
                 if node.id not in already_queried:
                     already_queried.add(node.id)
                     thread = threading.Thread(
-                        target=self._query_node, args=(node, target_id, shortlist)
+                        target=self._query_node, args=(
+                            node, target_id, shortlist)
                     )
                     threads.append(thread)
                     shortlist.remove(node)
@@ -50,8 +55,6 @@ class KademliaNode(KademliaRpcNode):
             # Wait for all threads to complete
             for thread in threads:
                 thread.join()
-            shortlist.sort(key=lambda node: node.id ^ target_id)
-            closest_nodes = list(set(shortlist))[:K]
             print("kademlia:lookup: contenido de la shortlist: ", shortlist)
             print("kademlia:lookup: already queried: ", list(already_queried))
             print("kademlia:lookup closest nodes: ", closest_nodes)
@@ -117,7 +120,7 @@ class KademliaNode(KademliaRpcNode):
                 for th in threads:
                     th.join()
                     if len(nodes) > 0:
-                        nodes.pop()
+                        nodes.pop(0)
         return responses
 
     def store_a_file(self, file_direction: str, key_save: Optional[int] = None):
@@ -151,7 +154,7 @@ class KademliaNode(KademliaRpcNode):
             for th in threads:
                 th.join()
                 if len(nodes) > 0:
-                    nodes.pop()
+                    nodes.pop(0)
         return responses
 
     # get values
@@ -192,7 +195,8 @@ class KademliaNode(KademliaRpcNode):
             del self.searched_data[key]
         returned_values.sort(key=lambda x: x[1], reverse=True)
         print("find value ordered returned: ", returned_values)
-        ret_val, _ = returned_values[0] if len(returned_values) > 0 else (None, None)
+        ret_val, _ = returned_values[0] if len(
+            returned_values) > 0 else (None, None)
         if ret_val is not None:
             th = threading.Thread(
                 target=self.sincronize_peer_data, args=[ret_val, DataType.Data]
@@ -216,18 +220,23 @@ class KademliaNode(KademliaRpcNode):
             )
         else:
             print("kademlia:lookup: archivo a actualizar: ", latest_value)
+            filetransfer = FileTransfer(self.ip)
+            filetransfer.receive_file(f"/tmp/songs/{latest_value[1]}")
+            filetransfer.close_transmission()
             self.store_a_file(latest_value, original_key)
 
     def get_a_file(self, key: int):
-        print(type(key))
-        print("kademlia:get-file: buscando la cancion: ", key)
+        print("kademlia:get-file: buscando la cancion: ", hex(key))
         nodes = self.node_lookup(key)
+        print(type(key))
+        print("nodos a buscar: ", nodes)
         threads = []
         self.searched_data[key] = []
         while len(nodes) > 0:
-            time.sleep(0.005)
+            time.sleep(0.0005)
             for node in nodes[:alpha]:
-                print(f"kademlia:get-file: sending a find_value to", node, " for ", key)
+                print(f"kademlia:get-file: sending a find_value to",
+                      node, " for ", key)
                 thread = threading.Thread(
                     target=self.wait_for_playlist,
                     args=[
@@ -239,26 +248,27 @@ class KademliaNode(KademliaRpcNode):
                 threads.append(thread)
                 thread.start()
             for th in threads:
+                nodes.pop(0)
+                print("nodos restantes: ", len(nodes))
                 th.join()
-                nodes.pop()
         returned_values = list(
-            filter(lambda x: x[0] is not None, self.searched_data[key])
+            filter(lambda x: x[1] is not None and x[1],
+                   self.searched_data[key])
         )
-        del self.searched_data[key]
+        print("wawawa")
+        with lock:
+            del self.searched_data[key]
         returned_values.sort(key=lambda x: x[1], reverse=True)
+        print("get-file:encontrado: ", returned_values)
         if len(returned_values) == 0:
             print("kademlia:get-file: valor no encontrado", key)
             return None
-        ret_val, _ = returned_values[0]
+        ret_val, _, _ = returned_values[0]
         th = threading.Thread(
-            target=self.sincronize_peer_data, args=[ret_val, DataType.File]
+            target=self.sincronize_peer_data, args=[
+                (ret_val, key), DataType.File]
         )  # sincronize the highest clock in all k nearest nodes
         th.start()
-
-        for resp_file, clock in returned_values[1:]:
-            if resp_file is not None:  # remove excedent files
-                os.remove(resp_file)
-
         return ret_val
 
     def get_all(self, filter) -> List[Tuple[str, str, str]]:
@@ -275,7 +285,8 @@ class KademliaNode(KademliaRpcNode):
             print(f"get-all: shortlist {short_list}")
             print(f"get-all: seen {already_seen}")
             print(f"get-all: allvalues {all_list}")
-            print(f" ---------- get-all: elapsed-time: {time.time()-start_time}")
+            print(
+                f" ---------- get-all: elapsed-time: {time.time()-start_time}")
 
             # Procesar en paralelo hasta `alpha` nodos
             for node in list(short_list)[:alpha]:

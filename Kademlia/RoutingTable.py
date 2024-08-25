@@ -66,6 +66,7 @@ class RoutingTable:
         """
         bucket_index = self.get_bucket_index(target_id)
         closest_nodes = []
+        print("closest bucket index to {target_id}: ", bucket_index)
         for node in self.buckets[bucket_index].get_nodes():
             closest_nodes.append(node)
         if len(closest_nodes) == count:

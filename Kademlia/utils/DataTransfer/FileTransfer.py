@@ -17,10 +17,13 @@ class FileTransfer:
         return port, s
 
     def start_trasmission(self, peer_address: Tuple[str, int]):
-        with open(self.file_direction, "rb") as file:
-            print(f"starting the transmission of {file}")
-            self.socket.connect(peer_address)
-            self.socket.sendfile(file)
+        try:
+            with open(self.file_direction, "rb") as file:
+                print(f"starting the transmission of {file}")
+                self.socket.connect(peer_address)
+                self.socket.sendfile(file)
+        except Exception as e:
+            print(e)
 
     def direction(self):
         return (self.ip, self.port)
