@@ -21,10 +21,20 @@ def init_node():
     node.start()
 
     discover_network(node)
-
+    time.sleep(2)
     # in case the node go down , he will try to set the data to his new owners
     print("finding owner nodes of my data")
-    for data in node.database.playlists:
+    Thread(target=replicate_data, args=[node]).start()
+    time.sleep(1)
+
+    return node
+
+
+def replicate_data(node):
+    playlists = node.database.playlists
+    node.database.playlists = []
+    node.database.save_snapshop()
+    for data in playlists:
         node.store_playlist(StoreAction.UPDATE, data)
     # Especifica la ruta de la carpeta que quieres listar
     song_folder = "/tmp/songs"
@@ -35,9 +45,7 @@ def init_node():
     # Imprime cada elemento
     for song in songs:
         print("restoring: ", song, "   ", song.split(".")[0])
-        node.store_a_file(song, int(song.split(".")[0], 16))
-
-    return node
+        node.store_a_file(song_folder + "/" + song, int(song.split(".")[0], 16))
 
 
 def discover_network(node):

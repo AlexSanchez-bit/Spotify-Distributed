@@ -22,10 +22,15 @@ UPLOAD_FOLDER = "uploads"
 def upload_song(data):
     songs = []
     for song in data["songs"]:
-        key = int(song["id"])
+        print("server:upload-song: saving: ", song)
+        if "id" not in song:
+            songs.append(Song.from_dict(song))
+            continue
+        key = int(song["id"], 16)
+        key_str = song["id"]
         try:
-            kademliaNode.store_a_file(f"{UPLOAD_FOLDER}/{key}", key)
-            new_song = Song(song["name"], song["author"], key, song["gender"])
+            kademliaNode.store_a_file(f"{UPLOAD_FOLDER}/{key_str}", key)
+            new_song = Song(song["name"], song["author"], key_str, song["gender"])
             songs.append(new_song)
         except Exception as e:
             print("server error on file upload: ", e)
@@ -173,24 +178,19 @@ def create_app():
         if file.filename == "":
             return "No selected file", 400
         if file:
-            filename = str(sha1_hash(file.filename))
+            filename = hex(sha1_hash(file.filename + f"{time.time()}")).lstrip("0x")
             file.save(os.path.join(app.config["UPLOAD_FOLDER"], f"{filename}"))
             return jsonify({"filename": filename}), 201
 
     @app.route("/get-song/<id>", methods=["GET"])
     def get_song(id):
-        global socketio
-        global sockets_ports
-        port = get_free_port()
-        host = kademliaNode.get_a_file(int(float(id)))
+        host = kademliaNode.get_a_file(int(id, 16))
         if host is None:
             return "Song Not Found", 404
-        thread = threading.Thread(target=set_socket, args=(id, port))
-        thread.start()
-        return jsonify({"host": host, "port": port}), 200
+        return jsonify({"host": host.ip}), 200
 
     def play_song(socketio, instant, id):
-        audio_file = AudioSegment.from_file(f"songs/{id}.mp3")
+        audio_file = AudioSegment.from_file(f"/tmp/songs/{id}.mp3")
         wav_audio = audio_file.export(format="wav")
         wav_audio_segment = AudioSegment.from_wav(io.BytesIO(wav_audio.read()))
         chunk_size = 1000  # Tamaño del fragmento en bytes
@@ -199,7 +199,9 @@ def create_app():
 
         @socketio.on("next_package")
         def send_packages(next_instant):
-            for i in range(next_instant * 1000, len(wav_audio_segment), chunk_size)[:3]:
+            for i in range(next_instant[0] * 1000, len(wav_audio_segment), chunk_size)[
+                :10
+            ]:
                 chunk_audio = wav_audio_segment[i : i + chunk_size]
                 chunk_bytes = io.BytesIO()
                 chunk_audio.export(chunk_bytes, format="wav")
@@ -208,7 +210,7 @@ def create_app():
                     {"index": i // chunk_size, "data": chunk_bytes.getvalue()},
                 )
 
-        send_packages(instant)
+        send_packages([instant])
 
     def set_socket(id, port):
         pass
@@ -222,18 +224,9 @@ def create_app():
         print("conexion establecida")
 
     @socketio.on("init_song")
-    def play(instant):
+    def play(params):
+        [instant, id] = params
         play_song(socketio, instant, id)
-
-    @socketio.on("message")
-    def handle_message(data):
-        print("received message: " + data)
-        emit("response", "pinga consorteeee")
-
-    @socketio.on("free_port")
-    def close_socket(port):
-        socketio.stop()
-        return "Socket cerrado", 200
 
     socketio.run(
         app,

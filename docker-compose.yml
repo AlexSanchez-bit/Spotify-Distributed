@@ -1,8 +1,6 @@
 services:
   node1:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: distribuido_node
     networks:
       - kademlia-network
     cap_add:
@@ -15,9 +13,7 @@ services:
       - .:/app
 
   node2:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: distribuido_node
     networks:
       - kademlia-network
     cap_add:
@@ -30,9 +26,7 @@ services:
       - .:/app
 
   node3:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: distribuido_node
     networks:
       - kademlia-network
     cap_add:
@@ -44,9 +38,7 @@ services:
     volumes:
       - .:/app
   node4:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: distribuido_node
     networks:
       - kademlia-network
     cap_add:
@@ -58,9 +50,7 @@ services:
     volumes:
       - .:/app
   node5:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: distribuido_node
     networks:
       - kademlia-network
     cap_add:
@@ -72,9 +62,7 @@ services:
     volumes:
       - .:/app
   node6:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: distribuido_node
     networks:
       - kademlia-network
     cap_add:
@@ -86,9 +74,7 @@ services:
     volumes:
       - .:/app
   node7:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: distribuido_node
     networks:
       - kademlia-network
     cap_add:
@@ -100,9 +86,7 @@ services:
     volumes:
       - .:/app
   node8:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: distribuido_node
     networks:
       - kademlia-network
     cap_add:

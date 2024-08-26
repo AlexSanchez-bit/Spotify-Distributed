@@ -61,12 +61,14 @@ class Playlist:
 
     @classmethod
     def from_dict(cls, data):
-        playlist = cls(data["title"], data["author"], data["id"], data["gender"])
-        playlist.songs = [Song.from_dict(song_data) for song_data in data["songs"]]
+        playlist = cls(data["title"], data["author"],
+                       data["id"], data["gender"])
+        playlist.songs = [Song.from_dict(song_data)
+                          for song_data in data["songs"]]
         return playlist
 
     def __str__(self):
-        return f"{'{'}title:{self.title},author:{self.author}{'}'}"
+        return f"{'{'}title:{self.title},author:{self.author},id:{self.id}{'}'}"
 
 
 class PlaylistManager:
