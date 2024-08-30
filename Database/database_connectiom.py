@@ -9,6 +9,7 @@ lock = threading.Lock()
 
 
 class Gender(Enum):
+    Any = ""
     Rock = "Rock"
     Jazz = "Jazz"
     Romance = "Romance"
@@ -29,7 +30,7 @@ class Song:
             "name": self.name,
             "author": self.author,
             "key": self.key,
-            "gender": self.gender,
+            "gender": f"{self.gender}",
         }
 
     @classmethod
@@ -37,6 +38,12 @@ class Song:
         song = cls(data["name"], data["author"], data["key"], data["gender"])
         song.key = data["key"]
         return song
+
+    def __eq__(self, o):
+        return self.key == o.key
+
+    def __hash__(self):
+        return int(self.key, 16)
 
 
 class Playlist:
@@ -77,8 +84,36 @@ class PlaylistManager:
         self.playlists = saved.playlists if saved is not None else []
         self.actions_registered = []
 
+    def get_all_songs(self, filter):
+        filtered_songs = []
+        print("get-all-songs filtering: ", filter)
+        for playlist in self.playlists:
+            for song in playlist.songs:
+                match = True
+                if (
+                    filter.get("title") not in [None, ""]
+                    and filter["title"].lower() not in song.name.lower()
+                ):
+                    match = False
+                if (
+                    filter.get("author") not in [None, ""]
+                    and filter["author"].lower() not in song.author.lower()
+                ):
+                    match = False
+                if (
+                    filter.get("gender") not in [None, ""]
+                    and filter["gender"] != song.gender
+                ):
+                    match = False
+
+                if match:
+                    filtered_songs.append(song)
+        return filtered_songs
+
     def get_all(self, filter):
         print("filtering", filter)
+        if "songs" in filter:
+            return self.get_all_songs(filter.get("songs"))
         if filter is not None:
             filtered_playlists = []
             for playlist in self.playlists:

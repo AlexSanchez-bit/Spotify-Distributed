@@ -45,7 +45,8 @@ class KademliaNode(KademliaRpcNode):
                 if node.id not in already_queried:
                     already_queried.add(node.id)
                     thread = threading.Thread(
-                        target=self._query_node, args=(node, target_id, shortlist)
+                        target=self._query_node, args=(
+                            node, target_id, shortlist)
                     )
                     threads.append(thread)
                     shortlist.remove(node)
@@ -122,16 +123,21 @@ class KademliaNode(KademliaRpcNode):
                         nodes.pop(0)
         return responses
 
-    def store_a_file(self, file_direction: str, key_save: Optional[int] = None):
+    def store_a_file(
+        self,
+        file_direction: str,
+        key_save: Optional[int] = None,
+        action=StoreAction.INSERT,
+    ):
         key = sha1_hash(file_direction) if key_save is None else key_save
         print("kademlia:store-file: buscando nodos para: ", key)
         nodes = self.node_lookup(key)
         print("kademlia:store-file: nodos para: ", key, "->", nodes)
-        resp = self.send_store_file(nodes, key, file_direction)
+        resp = self.send_store_file(nodes, key, file_direction, action)
         print("kademlia:store-file: respuesta del store file: ", resp)
         return key_save
 
-    def send_store_file(self, nodes, key, file_direction):
+    def send_store_file(self, nodes, key, file_direction, action=StoreAction.INSERT):
         threads = []
         time.sleep(0.005)
         responses = []
@@ -145,7 +151,7 @@ class KademliaNode(KademliaRpcNode):
                     args=[
                         key,
                         node,
-                        (StoreAction.INSERT, DataType.File, file_direction),
+                        (action, DataType.File, file_direction),
                     ],
                 )
                 threads.append(thread)
@@ -194,7 +200,8 @@ class KademliaNode(KademliaRpcNode):
             del self.searched_data[key]
         returned_values.sort(key=lambda x: x[1], reverse=True)
         print("find value ordered returned: ", returned_values)
-        ret_val, _ = returned_values[0] if len(returned_values) > 0 else (None, None)
+        ret_val, _ = returned_values[0] if len(
+            returned_values) > 0 else (None, None)
         if ret_val is not None:
             th = threading.Thread(
                 target=self.sincronize_peer_data, args=[ret_val, DataType.Data]
@@ -233,7 +240,8 @@ class KademliaNode(KademliaRpcNode):
         while len(nodes) > 0:
             time.sleep(0.0005)
             for node in nodes[:alpha]:
-                print(f"kademlia:get-file: sending a find_value to", node, " for ", key)
+                print(f"kademlia:get-file: sending a find_value to",
+                      node, " for ", key)
                 thread = threading.Thread(
                     target=self.wait_for_playlist,
                     args=[
@@ -249,7 +257,8 @@ class KademliaNode(KademliaRpcNode):
                 print("nodos restantes: ", len(nodes))
                 th.join()
         returned_values = list(
-            filter(lambda x: x[1] is not None and x[1], self.searched_data[key])
+            filter(lambda x: x[1] is not None and x[1],
+                   self.searched_data[key])
         )
         print("wawawa")
         with lock:
@@ -281,7 +290,8 @@ class KademliaNode(KademliaRpcNode):
             print(f"get-all: shortlist {short_list}")
             print(f"get-all: seen {already_seen}")
             print(f"get-all: allvalues {all_list}")
-            print(f" ---------- get-all: elapsed-time: {time.time()-start_time}")
+            print(
+                f" ---------- get-all: elapsed-time: {time.time()-start_time}")
 
             # Procesar en paralelo hasta `alpha` nodos
             for node in list(short_list)[:alpha]:

@@ -45,14 +45,17 @@ def replicate_data(node):
     # Imprime cada elemento
     for song in songs:
         print("restoring: ", song, "   ", song.split(".")[0])
-        node.store_a_file(song_folder + "/" + song, int(song.split(".")[0], 16))
+        node.store_a_file(song_folder + "/" + song,
+                          int(song.split(".")[0], 16))
+        os.remove(song_folder + "/" + song)
 
 
 def discover_network(node):
     print("initializing: ....starting network discovery")
     print("initializing: broadcast address", node.consensus.broadcast_address)
     node.ping(Node(node.consensus.broadcast_address, node.port))
-    node.consensus.send_broadcast_rpc(Rpc(RpcType.Ping, MessageType.Request, "Ping"))
+    node.consensus.send_broadcast_rpc(
+        Rpc(RpcType.Ping, MessageType.Request, "Ping"))
     node.ping(Node("224.1.1.1", node.port))
     # for adress in list(node.consensus.network_info.hosts())[:10]:
     #     print(node.ping(Node(str(adress), node.port)))

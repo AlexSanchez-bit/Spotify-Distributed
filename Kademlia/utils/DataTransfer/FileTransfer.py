@@ -36,7 +36,6 @@ class FileTransfer:
             conn, addr = self.socket.accept()
             with open(save_path, "wb") as file:
                 while True:
-                    print("reciving transmission")
                     data = conn.recv(4096)
                     if not data:
                         break

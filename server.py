@@ -30,7 +30,8 @@ def upload_song(data):
         key_str = song["id"]
         try:
             kademliaNode.store_a_file(f"{UPLOAD_FOLDER}/{key_str}", key)
-            new_song = Song(song["name"], song["author"], key_str, song["gender"])
+            new_song = Song(song["name"], song["author"],
+                            key_str, song["gender"])
             songs.append(new_song)
         except Exception as e:
             print("server error on file upload: ", e)
@@ -118,6 +119,29 @@ def create_app():
             {"items": result[from_index:to_index], "count": len(result)}
         ), 200
 
+    @app.route("/get-all-songs", methods=["POST"])
+    def get_all_songs():
+        data = request.json
+        filter = {"songs": data.get("filter", None)}
+        result = kademliaNode.get_all(filter)
+        to_index = data.get("to", len(result))
+        from_index = data.get("from", 0)
+        if result is None:
+            return jsonify({"message": "No playlists found"}), 404
+        ret = Playlist(
+            f"search{time.time}",
+            "sotify",
+            f"{time.time()}",
+            "",
+            result[from_index:to_index],
+        ).to_dict()
+        return jsonify(ret), 200
+
+    @app.route("/remove-song/<id>", methods=["DELETE"])
+    def remove_song(id):
+        resp = kademliaNode.store_a_file("", int(id, 16), StoreAction.DELETE)
+        return resp
+
     @app.route("/get-playlist/<id>", methods=["GET"])
     def get_playlist(id):
         result = kademliaNode.get_playlist(id)
@@ -154,7 +178,8 @@ def create_app():
     def update_playlist():
         data = request.json
         print(data)
-        playlist = Playlist(data["title"], data["author"], data["id"], data["gender"])
+        playlist = Playlist(data["title"], data["author"],
+                            data["id"], data["gender"])
         songs = upload_song(data)
         playlist.songs = songs
         kademliaNode.store_playlist(StoreAction.UPDATE, playlist)
@@ -178,7 +203,8 @@ def create_app():
         if file.filename == "":
             return "No selected file", 400
         if file:
-            filename = hex(sha1_hash(file.filename + f"{time.time()}")).lstrip("0x")
+            filename = hex(sha1_hash(file.filename +
+                           f"{time.time()}")).lstrip("0x")
             file.save(os.path.join(app.config["UPLOAD_FOLDER"], f"{filename}"))
             return jsonify({"filename": filename}), 201
 
@@ -202,7 +228,7 @@ def create_app():
             for i in range(next_instant[0] * 1000, len(wav_audio_segment), chunk_size)[
                 :10
             ]:
-                chunk_audio = wav_audio_segment[i : i + chunk_size]
+                chunk_audio = wav_audio_segment[i: i + chunk_size]
                 chunk_bytes = io.BytesIO()
                 chunk_audio.export(chunk_bytes, format="wav")
                 socketio.emit(

@@ -162,7 +162,8 @@ class KademliaRpcNode(RpcNode):
                     has_file, clock_ticks = self.file_transfers[identifier]
                     with lock:
                         del self.file_transfers[identifier]
-                    print("find file returning: ", (node, has_file, clock_ticks))
+                    print("find file returning: ",
+                          (node, has_file, clock_ticks))
                     return (node, has_file, clock_ticks)
             print("timeout exceeded on file search: ", key)
             with lock:
@@ -177,7 +178,8 @@ class KademliaRpcNode(RpcNode):
             data_type, elid = data
             self.network.send_rpc(
                 node,
-                Rpc(RpcType.FindValue, MessageType.Request, (key, data_type, elid)),
+                Rpc(RpcType.FindValue, MessageType.Request,
+                    (key, data_type, elid)),
             )
             identifier = f"{key}{node.id}"
             self.values_requests[f"{key}{node.id}"] = None
@@ -277,8 +279,11 @@ class KademliaRpcNode(RpcNode):
                         (key, (action, data_type, (port, file_transfers.port))),
                     ),
                 )
-                file_transfers.receive_file(f"/tmp/songs/{hex(key).lstrip('0x')}.mp3")
-                file_transfers.close_transmission()
+                if action is not StoreAction.DELETE:
+                    file_transfers.receive_file(
+                        f"/tmp/songs/{hex(key).lstrip('0x')}.mp3"
+                    )
+                    file_transfers.close_transmission()
             else:
                 print("kademlia:rpc recibido : ", data, " para: ", action)
                 try:
@@ -311,6 +316,10 @@ class KademliaRpcNode(RpcNode):
             if data_type is DataType.File:
                 request_port, peer_port = data
                 identifier = f"{key}{request_port}"
+                if action is StoreAction.DELETE:
+                    os.remove(f"/tmp/songs/{key}.mp3")
+                    del self.file_transfers[identifier]
+                    return
                 try:
                     self.file_transfers[identifier].start_trasmission(
                         (node.ip, peer_port)
@@ -334,7 +343,8 @@ class KademliaRpcNode(RpcNode):
             if data_type is DataType.Data:
                 print("find value data: ", key)
                 if key < 0:
-                    print("find value responding: ", self.database.get_all(data))
+                    print("find value responding: ",
+                          self.database.get_all(data))
                     print("find value filter", data)
                     self.network.send_rpc(
                         address,
@@ -367,7 +377,8 @@ class KademliaRpcNode(RpcNode):
                         (
                             key,
                             DataType.File,
-                            os.path.exists(f"/tmp/songs/{hex(key).lstrip('0x')}.mp3"),
+                            os.path.exists(
+                                f"/tmp/songs/{hex(key).lstrip('0x')}.mp3"),
                         ),
                     ),
                 )
@@ -381,7 +392,8 @@ class KademliaRpcNode(RpcNode):
         if message_type is MessageType.Response:
             if data_type is DataType.Data:
                 print(f"rpc: find-value: recibida{data} para{key}")
-                self.values_requests[f"{key}{address.id}"] = (data, clock_ticks)
+                self.values_requests[f"{key}{address.id}"] = (
+                    data, clock_ticks)
                 print(self.values_requests)
             else:
                 print(
